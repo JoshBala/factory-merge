@@ -2,7 +2,7 @@
 
 ## Project info
 
-**URL**: Replace with your deployed project URL.
+**URL**: https://joshbala.github.io/factory-merge/
 
 ## How can I edit this code?
 
