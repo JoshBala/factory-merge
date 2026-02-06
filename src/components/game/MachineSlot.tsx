@@ -81,7 +81,7 @@ export const MachineSlot = ({ slotIndex, machine }: MachineSlotProps) => {
     <button
       onClick={handleClick}
       className={cn(
-        'w-full h-full min-h-[80px] rounded-lg border-2 flex flex-col items-center justify-center transition-all',
+        'w-full aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all',
         'text-foreground font-medium',
         machine ? (
           machine.disabled 
