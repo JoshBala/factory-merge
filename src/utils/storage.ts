@@ -1,5 +1,6 @@
 // === LOCAL STORAGE PERSISTENCE ===
 import { GameState } from '@/types/game';
+import { migrateGameState } from '@/utils/migrations';
 
 const STORAGE_KEY = 'idle_merge_factory_save';
 
@@ -19,7 +20,8 @@ export const loadGame = (): GameState | null => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return null;
-    return JSON.parse(saved) as GameState;
+    const parsed = JSON.parse(saved) as GameState;
+    return migrateGameState(parsed);
   } catch (e) {
     console.warn('Failed to load game:', e);
     return null;
