@@ -62,7 +62,11 @@ export const GameScreen = () => {
       {/* Row upgrades modal */}
       <RowUpgradesModal 
         isOpen={showRowUpgrades}
-        onClose={() => setShowRowUpgrades(false)}
+        onClose={() => {
+          setShowRowUpgrades(false);
+          setFocusedRow(null);
+        }}
+        initialRow={focusedRow}
       />
     </div>
   );
