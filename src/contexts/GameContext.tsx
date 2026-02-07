@@ -9,17 +9,7 @@ import {
 } from '@/utils/calculations';
 import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
-
-// Initial state for new game
-const createInitialState = (): GameState => ({
-  currency: 50, // Starting money to buy first machines
-  machines: [],
-  activeDisaster: null,
-  selectedMachineId: null,
-  lastTickTime: Date.now(),
-  totalPlayTime: 0,
-  rowModules: [], // No modules initially
-});
+import { createInitialState } from '@/utils/state';
 
 // === REDUCER ===
 const gameReducer = (state: GameState, action: GameAction): GameState => {
@@ -48,6 +38,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         activeDisaster,
         lastTickTime: Date.now(),
         totalPlayTime: state.totalPlayTime + action.deltaMs,
+        stats: {
+          ...state.stats,
+          lifetimeCurrencyEarned: state.stats.lifetimeCurrencyEarned + earnings,
+        },
       };
     }
 
@@ -65,6 +59,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currency: state.currency - BALANCE.baseMachineCost,
         machines: [...state.machines, newMachine],
+        stats: {
+          ...state.stats,
+          lifetimeMachinesBought: state.stats.lifetimeMachinesBought + 1,
+          highestMachineLevel: Math.max(state.stats.highestMachineLevel, newMachine.level),
+        },
       };
     }
 
@@ -95,6 +94,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           .filter(m => m.id !== source.id && m.id !== target.id)
           .concat(mergedMachine),
         selectedMachineId: null,
+        stats: {
+          ...state.stats,
+          lifetimeMerges: state.stats.lifetimeMerges + 1,
+          highestMachineLevel: Math.max(state.stats.highestMachineLevel, mergedMachine.level),
+        },
       };
     }
 

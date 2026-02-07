@@ -10,6 +10,7 @@ import { RowModule, Machine } from '@/types/game';
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { getProductionRate } from '@/config/balance';
+import { GameMenuModal } from './GameMenuModal';
 
 // Calculate per-row contribution
 const getRowContributions = (machines: Machine[], rowModules: RowModule[]) => {
@@ -70,6 +71,9 @@ export const GameHUD = () => {
 
   return (
     <header className="bg-card border-b border-border p-4">
+      <div className="flex justify-end mb-2">
+        <GameMenuModal />
+      </div>
       {/* Currency display */}
       <div className="text-center mb-2">
         <span className="text-2xl font-bold text-foreground">

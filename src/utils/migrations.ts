@@ -38,5 +38,12 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
 
 export const migrateGameState = (state: GameState): GameState => ({
   ...state,
+  saveVersion: state.saveVersion ?? 0,
+  stats: {
+    lifetimeCurrencyEarned: state.stats?.lifetimeCurrencyEarned ?? 0,
+    lifetimeMachinesBought: state.stats?.lifetimeMachinesBought ?? 0,
+    lifetimeMerges: state.stats?.lifetimeMerges ?? 0,
+    highestMachineLevel: state.stats?.highestMachineLevel ?? 0,
+  },
   rowModules: migrateRowModules(state.rowModules || []),
 });

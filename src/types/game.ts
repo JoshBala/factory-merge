@@ -46,6 +46,13 @@ export interface RowModule {
   bonuses: RowBonus[];
 }
 
+export interface GameStats {
+  lifetimeCurrencyEarned: number;
+  lifetimeMachinesBought: number;
+  lifetimeMerges: number;
+  highestMachineLevel: number;
+}
+
 export interface GameState {
   currency: number;
   machines: Machine[];
@@ -54,6 +61,8 @@ export interface GameState {
   lastTickTime: number;
   totalPlayTime: number;
   rowModules: RowModule[]; // 0-3 modules, one per row
+  stats: GameStats;
+  saveVersion?: number;
 }
 
 // === GAME BALANCE CONSTANTS (legacy wrapper, prefer importing from balance.ts) ===
