@@ -18,6 +18,8 @@ const createInitialState = (): GameState => ({
   lastTickTime: Date.now(),
   totalPlayTime: 0,
   rowModules: [], // No modules initially
+  ownedUpgrades: {},
+  upgradePoints: 0,
 });
 
 // === REDUCER ===
@@ -146,10 +148,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
 
     case 'LOAD_GAME': {
-      // Ensure rowModules exists for backwards compatibility
+      // Ensure newly added fields exist for backwards compatibility
       const loadedState = {
         ...action.state,
         rowModules: action.state.rowModules || [],
+        ownedUpgrades: action.state.ownedUpgrades || {},
+        upgradePoints: action.state.upgradePoints ?? 0,
       };
       return { ...loadedState, lastTickTime: Date.now() };
     }
@@ -275,8 +279,13 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Try to load saved game
     const saved = loadGame();
     if (saved) {
-      // Ensure rowModules exists for backwards compatibility
-      return { ...saved, rowModules: saved.rowModules || [] };
+      // Ensure newly added fields exist for backwards compatibility
+      return {
+        ...saved,
+        rowModules: saved.rowModules || [],
+        ownedUpgrades: saved.ownedUpgrades || {},
+        upgradePoints: saved.upgradePoints ?? 0,
+      };
     }
     return createInitialState();
   });

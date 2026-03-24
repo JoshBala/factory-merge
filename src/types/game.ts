@@ -44,6 +44,39 @@ export interface RowModule {
   bonuses: RowBonus[];
 }
 
+export type UpgradeId = string;
+
+export type UpgradeCategory =
+  | 'automation'
+  | 'speed'
+  | 'production'
+  | 'base_generation'
+  | 'efficiency'
+  | 'cost_reduction'
+  | 'utility';
+
+export interface UpgradeDefinition {
+  id: UpgradeId;
+  name: string;
+  description: string;
+  category: UpgradeCategory;
+  tier: number;
+  maxLevel: number;
+  baseCost: number;
+  costGrowth: number;
+  effects: Record<string, number>;
+  unlockRequirements?: {
+    minTier?: number;
+    requiredUpgrades?: Array<{ id: UpgradeId; level: number }>;
+  };
+}
+
+export interface OwnedUpgrade {
+  id: UpgradeId;
+  level: number;
+  purchasedAt?: number;
+}
+
 export interface GameState {
   currency: number;
   machines: Machine[];
@@ -52,6 +85,8 @@ export interface GameState {
   lastTickTime: number;
   totalPlayTime: number;
   rowModules: RowModule[]; // 0-3 modules, one per row
+  ownedUpgrades: Record<UpgradeId, number>;
+  upgradePoints?: number;
 }
 
 // === GAME BALANCE CONSTANTS (legacy wrapper, prefer importing from balance.ts) ===
@@ -163,4 +198,7 @@ export type GameAction =
   | { type: 'UPGRADE_ROW'; rowIndex: 0 | 1 | 2 }
   | { type: 'REROLL_BONUS'; rowIndex: 0 | 1 | 2; bonusIndex: number }
   | { type: 'MOVE_MACHINE'; machineId: string; targetSlot: number }
-  | { type: 'SCRAP_MACHINE'; machineId: string };
+  | { type: 'SCRAP_MACHINE'; machineId: string }
+  | { type: 'BUY_UPGRADE'; upgradeId: UpgradeId }
+  | { type: 'REFUND_UPGRADE'; upgradeId: UpgradeId }
+  | { type: 'RESET_UPGRADES' };
