@@ -23,7 +23,7 @@ export interface Disaster {
 // === ROW MODULE TYPES ===
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
-export type BonusType = 
+export type BonusKind = 
   | 'productionPercent'           // +Production% (APPLIED)
   | 'productionAfterMerge'        // +Production-after-merge% (STUB)
   | 'disasterDurationReduction'   // -Disaster duration% (APPLIED)
@@ -34,8 +34,10 @@ export type BonusType =
   | 'offlineEarningsPercent';     // +Offline earnings% (STUB)
 
 export interface RowBonus {
-  type: BonusType;
-  roll: number; // Normalized 0..1
+  kind: BonusKind;
+  value: number;
+  rarity?: Rarity;
+  locked: boolean;
 }
 
 export interface RowModule {
@@ -44,37 +46,11 @@ export interface RowModule {
   bonuses: RowBonus[];
 }
 
-export type UpgradeId = string;
-
-export type UpgradeCategory =
-  | 'automation'
-  | 'speed'
-  | 'production'
-  | 'base_generation'
-  | 'efficiency'
-  | 'cost_reduction'
-  | 'utility';
-
-export interface UpgradeDefinition {
-  id: UpgradeId;
-  name: string;
-  description: string;
-  category: UpgradeCategory;
-  tier: number;
-  maxLevel: number;
-  baseCost: number;
-  costGrowth: number;
-  effects: Record<string, number>;
-  unlockRequirements?: {
-    minTier?: number;
-    requiredUpgrades?: Array<{ id: UpgradeId; level: number }>;
-  };
-}
-
-export interface OwnedUpgrade {
-  id: UpgradeId;
-  level: number;
-  purchasedAt?: number;
+export interface GameStats {
+  lifetimeCurrencyEarned: number;
+  lifetimeMachinesBought: number;
+  lifetimeMerges: number;
+  highestMachineLevel: number;
 }
 
 export interface GameState {
@@ -85,8 +61,8 @@ export interface GameState {
   lastTickTime: number;
   totalPlayTime: number;
   rowModules: RowModule[]; // 0-3 modules, one per row
-  ownedUpgrades: Record<UpgradeId, number>;
-  upgradePoints?: number;
+  stats: GameStats;
+  saveVersion?: number;
 }
 
 // === GAME BALANCE CONSTANTS (legacy wrapper, prefer importing from balance.ts) ===
@@ -132,7 +108,7 @@ export const RARITY_BONUS_COUNT: Record<Rarity, number> = {
 };
 
 // Bonus ranges per rarity tier: [min, max] as percentages
-export const BONUS_RANGES: Record<BonusType, Record<Rarity, [number, number]>> = {
+export const BONUS_RANGES: Record<BonusKind, Record<Rarity, [number, number]>> = {
   productionPercent: {
     common: [5, 10],
     uncommon: [10, 20],
@@ -196,7 +172,8 @@ export type GameAction =
   | { type: 'LOAD_GAME'; state: GameState }
   | { type: 'RESET_GAME' }
   | { type: 'UPGRADE_ROW'; rowIndex: 0 | 1 | 2 }
-  | { type: 'REROLL_BONUS'; rowIndex: 0 | 1 | 2; bonusIndex: number }
+  | { type: 'REROLL_ROW_BONUSES'; rowIndex: 0 | 1 | 2 }
+  | { type: 'TOGGLE_ROW_BONUS_LOCK'; rowIndex: 0 | 1 | 2; bonusIndex: number }
   | { type: 'MOVE_MACHINE'; machineId: string; targetSlot: number }
   | { type: 'SCRAP_MACHINE'; machineId: string }
   | { type: 'BUY_UPGRADE'; upgradeId: UpgradeId }

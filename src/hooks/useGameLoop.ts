@@ -10,36 +10,69 @@ interface UseGameLoopProps {
 }
 
 export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
-  const lastTickRef = useRef(Date.now());
+  const lastFrameRef = useRef<number | null>(null);
   const lastDisasterCheckRef = useRef(Date.now());
+  const accumulatedTimeRef = useRef(0);
+  const animationFrameRef = useRef<number | null>(null);
+  const stateRef = useRef(state);
+
+  const maxFrameDeltaSeconds = 0.1;
+  const uiUpdateIntervalSeconds = 0.1;
 
   useEffect(() => {
-    const gameLoop = setInterval(() => {
-      const now = Date.now();
-      const deltaMs = now - lastTickRef.current;
-      lastTickRef.current = now;
+    stateRef.current = state;
+  }, [state]);
 
-      // Production tick
-      dispatch({ type: 'TICK', deltaMs });
+  useEffect(() => {
+    const step = (time: number) => {
+      if (lastFrameRef.current === null) {
+        lastFrameRef.current = time;
+      }
+
+      const deltaSeconds = Math.min(
+        (time - lastFrameRef.current) / 1000,
+        maxFrameDeltaSeconds
+      );
+      lastFrameRef.current = time;
+      accumulatedTimeRef.current += deltaSeconds;
+
+      const now = Date.now();
 
       // Disaster check (every 30s)
       if (now - lastDisasterCheckRef.current >= GAME_CONFIG.disasterCheckInterval) {
         lastDisasterCheckRef.current = now;
-        
+
         // Only trigger if no active disaster and player has machines
-        if (!state.activeDisaster && state.machines.length > 0) {
+        const currentState = stateRef.current;
+        if (!currentState.activeDisaster && currentState.machines.length > 0) {
           if (Math.random() < GAME_CONFIG.disasterChance) {
-            const disaster = generateDisaster(state, state.rowModules);
+            const disaster = generateDisaster(currentState, currentState.rowModules);
             if (disaster) {
               dispatch({ type: 'START_DISASTER', disaster });
             }
           }
         }
       }
-    }, GAME_CONFIG.tickInterval);
 
-    return () => clearInterval(gameLoop);
-  }, [dispatch, state.activeDisaster, state.machines, state.rowModules]);
+      if (accumulatedTimeRef.current >= uiUpdateIntervalSeconds) {
+        const deltaMs = accumulatedTimeRef.current * 1000;
+        accumulatedTimeRef.current = 0;
+
+        // Production tick
+        dispatch({ type: 'TICK', deltaMs });
+      }
+
+      animationFrameRef.current = requestAnimationFrame(step);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(step);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [dispatch]);
 };
 
 // Calculate global disaster duration reduction from all row modules

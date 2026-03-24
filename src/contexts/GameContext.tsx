@@ -4,23 +4,12 @@ import { GameState, GameAction, Machine, GAME_CONFIG } from '@/types/game';
 import { BALANCE, getScrapRefund } from '@/config/balance';
 import { 
   generateId, calculateEarnings, canMerge, getMergedLevel, 
-  getRepairCost, createRowModule, upgradeRowModule, rerollBonus,
+  getRepairCost, createRowModule, upgradeRowModule, rerollRowBonuses,
   getRowUpgradeCost, getRerollCost, getNextRarity
 } from '@/utils/calculations';
 import { saveGame, loadGame, deleteSave } from '@/utils/storage';
-
-// Initial state for new game
-const createInitialState = (): GameState => ({
-  currency: 50, // Starting money to buy first machines
-  machines: [],
-  activeDisaster: null,
-  selectedMachineId: null,
-  lastTickTime: Date.now(),
-  totalPlayTime: 0,
-  rowModules: [], // No modules initially
-  ownedUpgrades: {},
-  upgradePoints: 0,
-});
+import { migrateGameState } from '@/utils/migrations';
+import { createInitialState } from '@/utils/state';
 
 // === REDUCER ===
 const gameReducer = (state: GameState, action: GameAction): GameState => {
@@ -49,6 +38,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         activeDisaster,
         lastTickTime: Date.now(),
         totalPlayTime: state.totalPlayTime + action.deltaMs,
+        stats: {
+          ...state.stats,
+          lifetimeCurrencyEarned: state.stats.lifetimeCurrencyEarned + earnings,
+        },
       };
     }
 
@@ -66,6 +59,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currency: state.currency - BALANCE.baseMachineCost,
         machines: [...state.machines, newMachine],
+        stats: {
+          ...state.stats,
+          lifetimeMachinesBought: state.stats.lifetimeMachinesBought + 1,
+          highestMachineLevel: Math.max(state.stats.highestMachineLevel, newMachine.level),
+        },
       };
     }
 
@@ -96,6 +94,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           .filter(m => m.id !== source.id && m.id !== target.id)
           .concat(mergedMachine),
         selectedMachineId: null,
+        stats: {
+          ...state.stats,
+          lifetimeMerges: state.stats.lifetimeMerges + 1,
+          highestMachineLevel: Math.max(state.stats.highestMachineLevel, mergedMachine.level),
+        },
       };
     }
 
@@ -148,13 +151,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
 
     case 'LOAD_GAME': {
-      // Ensure newly added fields exist for backwards compatibility
-      const loadedState = {
-        ...action.state,
-        rowModules: action.state.rowModules || [],
-        ownedUpgrades: action.state.ownedUpgrades || {},
-        upgradePoints: action.state.upgradePoints ?? 0,
-      };
+      const loadedState = migrateGameState(action.state);
       return { ...loadedState, lastTickTime: Date.now() };
     }
 
@@ -194,19 +191,40 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
     }
 
-    case 'REROLL_BONUS': {
+    case 'REROLL_ROW_BONUSES': {
       const module = state.rowModules.find(m => m.rowIndex === action.rowIndex);
       if (!module) return state;
-      if (action.bonusIndex >= module.bonuses.length) return state;
+      const hasUnlocked = module.bonuses.some(bonus => !bonus.locked);
+      if (!hasUnlocked) return state;
       
       const cost = getRerollCost(action.rowIndex);
       if (state.currency < cost) return state;
       
-      const updated = rerollBonus(module, action.bonusIndex);
+      const updated = rerollRowBonuses(module);
       
       return {
         ...state,
         currency: state.currency - cost,
+        rowModules: state.rowModules.map(m =>
+          m.rowIndex === action.rowIndex ? updated : m
+        ),
+      };
+    }
+
+    case 'TOGGLE_ROW_BONUS_LOCK': {
+      const module = state.rowModules.find(m => m.rowIndex === action.rowIndex);
+      if (!module) return state;
+      if (action.bonusIndex >= module.bonuses.length) return state;
+
+      const updated = {
+        ...module,
+        bonuses: module.bonuses.map((bonus, idx) =>
+          idx === action.bonusIndex ? { ...bonus, locked: !bonus.locked } : bonus
+        ),
+      };
+
+      return {
+        ...state,
         rowModules: state.rowModules.map(m =>
           m.rowIndex === action.rowIndex ? updated : m
         ),
@@ -266,7 +284,8 @@ interface GameContextType {
     repairMachine: (id: string) => void;
     resetGame: () => void;
     upgradeRow: (rowIndex: 0 | 1 | 2) => void;
-    rerollBonus: (rowIndex: 0 | 1 | 2, bonusIndex: number) => void;
+    rerollBonus: (rowIndex: 0 | 1 | 2) => void;
+    toggleBonusLock: (rowIndex: 0 | 1 | 2, bonusIndex: number) => void;
     moveMachine: (machineId: string, targetSlot: number) => void;
     scrapMachine: (machineId: string) => void;
   };
@@ -279,13 +298,7 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Try to load saved game
     const saved = loadGame();
     if (saved) {
-      // Ensure newly added fields exist for backwards compatibility
-      return {
-        ...saved,
-        rowModules: saved.rowModules || [],
-        ownedUpgrades: saved.ownedUpgrades || {},
-        upgradePoints: saved.upgradePoints ?? 0,
-      };
+      return migrateGameState(saved);
     }
     return createInitialState();
   });
@@ -320,8 +333,10 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'RESET_GAME' }), []),
     upgradeRow: useCallback((rowIndex: 0 | 1 | 2) =>
       dispatch({ type: 'UPGRADE_ROW', rowIndex }), []),
-    rerollBonus: useCallback((rowIndex: 0 | 1 | 2, bonusIndex: number) =>
-      dispatch({ type: 'REROLL_BONUS', rowIndex, bonusIndex }), []),
+    rerollBonus: useCallback((rowIndex: 0 | 1 | 2) =>
+      dispatch({ type: 'REROLL_ROW_BONUSES', rowIndex }), []),
+    toggleBonusLock: useCallback((rowIndex: 0 | 1 | 2, bonusIndex: number) =>
+      dispatch({ type: 'TOGGLE_ROW_BONUS_LOCK', rowIndex, bonusIndex }), []),
     moveMachine: useCallback((machineId: string, targetSlot: number) =>
       dispatch({ type: 'MOVE_MACHINE', machineId, targetSlot }), []),
     scrapMachine: useCallback((machineId: string) =>

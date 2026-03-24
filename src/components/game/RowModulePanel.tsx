@@ -2,7 +2,7 @@
 import { useGame } from '@/contexts/GameContext';
 import { RowModule } from '@/types/game';
 import { 
-  calculateBonusValue, getBonusDisplayName, getRarityColor, getRarityName 
+  calculateBonusValue, getRarityColor, getRarityName 
 } from '@/utils/calculations';
 
 interface RowModulePanelProps {
@@ -47,9 +47,9 @@ const RowModuleCard = ({
       <div className="mt-1 space-y-0.5 w-full">
         {module ? (
           module.bonuses.slice(0, 2).map((bonus, idx) => {
-            const value = calculateBonusValue(bonus, module.rarity);
+            const value = calculateBonusValue(bonus);
             // Shortened display names
-            const shortName = getShortBonusName(bonus.type);
+            const shortName = getShortBonusName(bonus.kind);
             return (
               <div 
                 key={idx} 
@@ -75,7 +75,7 @@ const RowModuleCard = ({
 };
 
 // Shortened bonus names for compact display
-const getShortBonusName = (type: string): string => {
+const getShortBonusName = (kind: string): string => {
   const shortNames: Record<string, string> = {
     productionPercent: 'Prod',
     productionAfterMerge: 'Merge',
@@ -86,7 +86,7 @@ const getShortBonusName = (type: string): string => {
     automationSpeed: 'Auto',
     offlineEarningsPercent: 'Offline',
   };
-  return shortNames[type] || type;
+  return shortNames[kind] || kind;
 };
 
 export const RowModulePanel = ({ onRowClick }: RowModulePanelProps) => {

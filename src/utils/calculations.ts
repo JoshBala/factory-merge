@@ -1,7 +1,7 @@
 // === GAME CALCULATIONS ===
 import { 
   Machine, GAME_CONFIG, 
-  RowModule, Rarity, BonusType, RowBonus,
+  RowModule, Rarity, BonusKind, RowBonus,
   BONUS_RANGES, RARITY_BONUS_COUNT 
 } from '@/types/game';
 import { 
@@ -18,7 +18,7 @@ export const generateId = (): string =>
 // === ROW MODULE HELPERS ===
 
 // All 8 bonus types for random selection
-const ALL_BONUS_TYPES: BonusType[] = [
+const ALL_BONUS_TYPES: BonusKind[] = [
   'productionPercent',
   'productionAfterMerge',
   'disasterDurationReduction',
@@ -30,8 +30,8 @@ const ALL_BONUS_TYPES: BonusType[] = [
 ];
 
 // Get display name for bonus type
-export const getBonusDisplayName = (type: BonusType): string => {
-  const names: Record<BonusType, string> = {
+export const getBonusDisplayName = (type: BonusKind): string => {
+  const names: Record<BonusKind, string> = {
     productionPercent: '+Production',
     productionAfterMerge: '+Post-Merge Production',
     disasterDurationReduction: '-Disaster Duration',
@@ -45,10 +45,7 @@ export const getBonusDisplayName = (type: BonusType): string => {
 };
 
 // Calculate actual bonus value from normalized roll
-export const calculateBonusValue = (bonus: RowBonus, rarity: Rarity): number => {
-  const [min, max] = BONUS_RANGES[bonus.type][rarity];
-  return min + bonus.roll * (max - min);
-};
+export const calculateBonusValue = (bonus: RowBonus): number => bonus.value;
 
 // Get row index for a slot (0-2 = row 0, 3-5 = row 1, 6-8 = row 2)
 export const getRowForSlot = (slotIndex: number): 0 | 1 | 2 => {
@@ -77,19 +74,33 @@ export const getRerollCost = (rowIndex: 0 | 1 | 2): number => {
 };
 
 // Generate a random bonus (avoids existing types)
-export const generateRandomBonus = (existingTypes: BonusType[]): RowBonus => {
-  const available = ALL_BONUS_TYPES.filter(t => !existingTypes.includes(t));
-  const type = available.length > 0 
-    ? available[Math.floor(Math.random() * available.length)]
-    : ALL_BONUS_TYPES[Math.floor(Math.random() * ALL_BONUS_TYPES.length)];
-  return { type, roll: Math.random() };
+const getRandomBonusKind = (): BonusKind =>
+  ALL_BONUS_TYPES[Math.floor(Math.random() * ALL_BONUS_TYPES.length)];
+
+const scaleBonusValue = (
+  bonus: RowBonus,
+  fromRarity: Rarity,
+  toRarity: Rarity
+): number => {
+  const [fromMin, fromMax] = BONUS_RANGES[bonus.kind][fromRarity];
+  const [toMin, toMax] = BONUS_RANGES[bonus.kind][toRarity];
+  const roll = fromMax === fromMin ? 0 : (bonus.value - fromMin) / (fromMax - fromMin);
+  const clamped = Math.min(1, Math.max(0, roll));
+  return toMin + clamped * (toMax - toMin);
+};
+
+export const generateRandomBonus = (rarity: Rarity): RowBonus => {
+  const kind = getRandomBonusKind();
+  const [min, max] = BONUS_RANGES[kind][rarity];
+  const value = min + Math.random() * (max - min);
+  return { kind, value, locked: false };
 };
 
 // Create initial row module (common with 1 bonus)
 export const createRowModule = (rowIndex: 0 | 1 | 2): RowModule => ({
   rowIndex,
   rarity: 'common',
-  bonuses: [generateRandomBonus([])],
+  bonuses: [generateRandomBonus('common')],
 });
 
 // Upgrade row module to next rarity (keeps bonuses, adds new ones)
@@ -100,9 +111,13 @@ export const upgradeRowModule = (module: RowModule): RowModule | null => {
   const currentCount = module.bonuses.length;
   const targetCount = RARITY_BONUS_COUNT[nextRarity];
   
-  const newBonuses = [...module.bonuses];
+  const upgradedBonuses = module.bonuses.map(bonus => ({
+    ...bonus,
+    value: scaleBonusValue(bonus, module.rarity, nextRarity),
+  }));
+  const newBonuses = [...upgradedBonuses];
   for (let i = currentCount; i < targetCount; i++) {
-    newBonuses.push(generateRandomBonus(newBonuses.map(b => b.type)));
+    newBonuses.push(generateRandomBonus(nextRarity));
   }
   
   return {
@@ -113,10 +128,10 @@ export const upgradeRowModule = (module: RowModule): RowModule | null => {
 };
 
 // Reroll a specific bonus (keeps same type, new roll)
-export const rerollBonus = (module: RowModule, bonusIndex: number): RowModule => ({
+export const rerollRowBonuses = (module: RowModule): RowModule => ({
   ...module,
-  bonuses: module.bonuses.map((b, i) => 
-    i === bonusIndex ? { ...b, roll: Math.random() } : b
+  bonuses: module.bonuses.map(bonus =>
+    bonus.locked ? bonus : generateRandomBonus(module.rarity)
   ),
 });
 
@@ -130,8 +145,8 @@ export const getRowProductionBonus = (
   
   let totalBonus = 0;
   for (const bonus of module.bonuses) {
-    if (bonus.type === 'productionPercent') {
-      totalBonus += calculateBonusValue(bonus, module.rarity);
+    if (bonus.kind === 'productionPercent') {
+      totalBonus += calculateBonusValue(bonus);
     }
   }
   return totalBonus / 100; // Convert percentage to multiplier
@@ -147,8 +162,8 @@ export const getDisasterDurationReduction = (
   
   let totalReduction = 0;
   for (const bonus of module.bonuses) {
-    if (bonus.type === 'disasterDurationReduction') {
-      totalReduction += calculateBonusValue(bonus, module.rarity);
+    if (bonus.kind === 'disasterDurationReduction') {
+      totalReduction += calculateBonusValue(bonus);
     }
   }
   return totalReduction / 100; // Convert percentage to multiplier
