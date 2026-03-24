@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { toast } from '@/hooks/use-toast';
 import { GAME_VERSION } from '@/config/version';
@@ -54,13 +54,12 @@ const normalizeImportedState = (data: unknown): GameState | null => {
 export const GameMenuModal = () => {
   const { state, dispatch } = useGame();
   const [open, setOpen] = useState(false);
-  const [exportJson, setExportJson] = useState('');
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState('');
   const [resetText, setResetText] = useState('');
   const exportRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const buildExportJson = () => JSON.stringify(createSaveData(state));
+  const exportText = useMemo(() => JSON.stringify(createSaveData(state)), [state]);
 
   const handleSaveNow = () => {
     saveGame(state);
@@ -68,12 +67,9 @@ export const GameMenuModal = () => {
   };
 
   const handleCopySave = async () => {
-    if (!exportJson) {
-      setExportJson(buildExportJson());
-    }
     if (navigator.clipboard?.writeText) {
       try {
-        await navigator.clipboard.writeText(exportJson || buildExportJson());
+        await navigator.clipboard.writeText(exportText);
         toast({ title: 'Copied save' });
         return;
       } catch {
@@ -123,7 +119,6 @@ export const GameMenuModal = () => {
   const handleOpenChange = (nextOpen: boolean) => {
     setOpen(nextOpen);
     if (nextOpen) {
-      setExportJson(buildExportJson());
       setImportText('');
       setImportError('');
       setResetText('');
@@ -161,21 +156,10 @@ export const GameMenuModal = () => {
               </p>
             </div>
             <div className="space-y-2">
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" onClick={handleCopySave}>
-                  Copy save
-                </Button>
-                <Button variant="secondary" size="sm" onClick={() => setExportJson(buildExportJson())}>
-                  Refresh export
-                </Button>
-              </div>
-              <Textarea
-                ref={exportRef}
-                readOnly
-                value={exportJson}
-                placeholder="Open the menu or refresh to generate an export snapshot."
-                className="min-h-[120px]"
-              />
+              <Button variant="outline" onClick={handleCopySave}>
+                Copy save
+              </Button>
+              <Textarea ref={exportRef} readOnly value={exportText} className="min-h-[120px]" />
             </div>
             <div className="space-y-2">
               <Textarea
