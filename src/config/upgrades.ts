@@ -1,3 +1,5 @@
+import { BALANCE } from './balance';
+
 export type UpgradeCategory =
   | 'automation'
   | 'speed'
@@ -51,6 +53,32 @@ export interface UpgradeDefinition {
 const TIER_MIN = 1;
 const TIER_MAX = 15;
 const UPGRADES_PER_TIER = 8;
+const MIN_OWNED_MACHINE_REQUIREMENT = 2;
+const MAX_OWNED_MACHINE_REQUIREMENT = BALANCE.gridSize;
+const LINE_BALANCER_OWNED_MACHINE_START = MIN_OWNED_MACHINE_REQUIREMENT;
+const LINE_BALANCER_OWNED_MACHINE_END = Math.max(
+  MIN_OWNED_MACHINE_REQUIREMENT,
+  MAX_OWNED_MACHINE_REQUIREMENT - 1
+);
+const MESH_NETWORK_OWNED_MACHINE_START = Math.min(
+  MAX_OWNED_MACHINE_REQUIREMENT,
+  MIN_OWNED_MACHINE_REQUIREMENT + 1
+);
+
+const scaleOwnedMachineRequirementByTier = (
+  tier: number,
+  tierOneValue: number,
+  tierMaxValue: number
+): number => {
+  const clampedTier = Math.min(TIER_MAX, Math.max(TIER_MIN, tier));
+  const tierProgress = (clampedTier - TIER_MIN) / (TIER_MAX - TIER_MIN);
+  const scaledValue = tierOneValue + tierProgress * (tierMaxValue - tierOneValue);
+
+  return Math.min(
+    MAX_OWNED_MACHINE_REQUIREMENT,
+    Math.max(MIN_OWNED_MACHINE_REQUIREMENT, Math.round(scaledValue))
+  );
+};
 
 const CATEGORY_ROTATION: UpgradeCategory[] = [
   'automation',
@@ -113,7 +141,11 @@ const UPGRADE_BLUEPRINTS: Array<{
     unlockBuilder: (tier) => ({
       requiresUpgrades: [`u_t${tier}_core_output`],
       requiresCurrencyTotal: Math.round(210 * Math.pow(1.7, tier - 1)),
-      requiresOwnedMachines: Math.min(10 + tier, 40),
+      requiresOwnedMachines: scaleOwnedMachineRequirementByTier(
+        tier,
+        LINE_BALANCER_OWNED_MACHINE_START,
+        LINE_BALANCER_OWNED_MACHINE_END
+      ),
     }),
   },
   {
@@ -174,7 +206,11 @@ const UPGRADE_BLUEPRINTS: Array<{
     unlockBuilder: (tier) => ({
       requiresUpgrades: [`u_t${tier}_lean_supply`],
       requiresCurrencyTotal: Math.round(430 * Math.pow(1.79, tier - 1)),
-      requiresOwnedMachines: Math.min(15 + tier, 60),
+      requiresOwnedMachines: scaleOwnedMachineRequirementByTier(
+        tier,
+        MESH_NETWORK_OWNED_MACHINE_START,
+        MAX_OWNED_MACHINE_REQUIREMENT
+      ),
     }),
   },
   {
