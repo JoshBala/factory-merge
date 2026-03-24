@@ -29,7 +29,12 @@ export const GameScreen = () => {
   useEffect(() => {
     const saved = loadGame();
     if (saved && saved.machines.length > 0) {
-      const { earnings, timeAway } = calculateOfflineEarnings(saved.machines, saved.lastTickTime);
+      const { earnings, timeAway } = calculateOfflineEarnings(
+        saved.machines,
+        saved.lastTickTime,
+        saved.rowModules ?? [],
+        saved
+      );
       // Show modal if away > 1 minute and earned something
       if (earnings > 0 && timeAway > 60000) {
         setOfflineEarnings(earnings);
