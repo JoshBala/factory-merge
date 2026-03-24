@@ -7,6 +7,7 @@ import {
 
 interface RowModulePanelProps {
   onRowClick: (rowIndex: 0 | 1 | 2) => void;
+  onOpenUpgradeMenu?: () => void;
 }
 
 const ROW_LABELS = ['Top', 'Mid', 'Bot'] as const;
@@ -89,14 +90,14 @@ const getShortBonusName = (kind: string): string => {
   return shortNames[kind] || kind;
 };
 
-export const RowModulePanel = ({ onRowClick }: RowModulePanelProps) => {
+export const RowModulePanel = ({ onRowClick, onOpenUpgradeMenu }: RowModulePanelProps) => {
   const { state } = useGame();
 
   const getModule = (rowIndex: 0 | 1 | 2): RowModule | undefined =>
     state.rowModules.find(m => m.rowIndex === rowIndex);
 
   return (
-    <div className="flex flex-col gap-3 w-20">
+    <div className="flex flex-col gap-3 w-24">
       {([0, 1, 2] as const).map(rowIndex => (
         <div key={rowIndex} className="flex-1 min-h-[72px]">
           <RowModuleCard
@@ -106,6 +107,17 @@ export const RowModulePanel = ({ onRowClick }: RowModulePanelProps) => {
           />
         </div>
       ))}
+
+      {onOpenUpgradeMenu && (
+        <button
+          type="button"
+          onClick={onOpenUpgradeMenu}
+          className="w-full rounded-lg border border-border bg-card/80 px-2 py-1 text-[10px] text-left text-foreground hover:bg-card transition-colors"
+          title="Open full upgrade menu"
+        >
+          Upgrades
+        </button>
+      )}
     </div>
   );
 };
