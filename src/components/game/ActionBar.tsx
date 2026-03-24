@@ -1,4 +1,4 @@
-// === Bottom Action Bar: Repair + Scrap + Reset ===
+// === Bottom Action Bar: Repair + Scrap ===
 import { useState } from 'react';
 import { useGame } from '@/contexts/GameContext';
 import { getRepairCost, getScrapRefund, formatCurrency } from '@/utils/calculations';
@@ -38,12 +38,6 @@ export const ActionBar = () => {
     }
   };
 
-  const handleReset = () => {
-    if (confirm('Reset all progress? This cannot be undone.')) {
-      actions.resetGame();
-    }
-  };
-
   return (
     <footer className="bg-card border-t border-border p-4">
       {/* Resolved feedback */}
@@ -78,12 +72,6 @@ export const ActionBar = () => {
           }
         </Button>
         
-        <Button
-          onClick={handleReset}
-          variant="destructive"
-        >
-          Reset
-        </Button>
       </div>
     </footer>
   );
