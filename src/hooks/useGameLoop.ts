@@ -2,7 +2,7 @@
 // Handles production ticks and disaster generation
 import { useEffect, useRef } from 'react';
 import { GameState, GameAction, Disaster, GAME_CONFIG, RowModule } from '@/types/game';
-import { randomInRange, getDisasterDurationReduction } from '@/utils/calculations';
+import { randomInRange, resolveGameEffects } from '@/utils/calculations';
 
 interface UseGameLoopProps {
   state: GameState;
@@ -45,7 +45,8 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
         // Only trigger if no active disaster and player has machines
         const currentState = stateRef.current;
         if (!currentState.activeDisaster && currentState.machines.length > 0) {
-          if (Math.random() < GAME_CONFIG.disasterChance) {
+          const effects = resolveGameEffects(currentState.rowModules, currentState);
+          if (Math.random() < effects.disasterChance) {
             const disaster = generateDisaster(currentState, currentState.rowModules);
             if (disaster) {
               dispatch({ type: 'START_DISASTER', disaster });
@@ -54,7 +55,8 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
         }
       }
 
-      if (accumulatedTimeRef.current >= uiUpdateIntervalSeconds) {
+      const automationTickSeconds = resolveGameEffects(stateRef.current.rowModules, stateRef.current).automationIntervalMs / 1000;
+      if (accumulatedTimeRef.current >= Math.max(uiUpdateIntervalSeconds, automationTickSeconds)) {
         const deltaMs = accumulatedTimeRef.current * 1000;
         accumulatedTimeRef.current = 0;
 
@@ -77,12 +79,9 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
 
 // Calculate global disaster duration reduction from all row modules
 const getGlobalDisasterReduction = (rowModules: RowModule[]): number => {
-  let totalReduction = 0;
-  for (let row = 0; row < 3; row++) {
-    totalReduction += getDisasterDurationReduction(rowModules, row);
-  }
+  const effects = resolveGameEffects(rowModules);
   // Cap at 80% reduction to keep some challenge
-  return Math.min(totalReduction, 0.8);
+  return Math.min(0.8, 1 - effects.disasterDurationMultiplier);
 };
 
 // Generate a random disaster
