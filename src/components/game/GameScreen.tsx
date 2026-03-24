@@ -7,6 +7,7 @@ import { FactoryGrid } from './FactoryGrid';
 import { ActionBar } from './ActionBar';
 import { OfflineModal } from './OfflineModal';
 import { RowUpgradesModal } from './RowUpgradesModal';
+import { UpgradeMenu } from './UpgradeMenu';
 import { calculateOfflineEarnings } from '@/utils/calculations';
 import { loadGame } from '@/utils/storage';
 
@@ -15,6 +16,7 @@ export const GameScreen = () => {
   const [offlineEarnings, setOfflineEarnings] = useState<number | null>(null);
   const [showRowUpgrades, setShowRowUpgrades] = useState(false);
   const [focusedRow, setFocusedRow] = useState<0 | 1 | 2 | null>(null);
+  const [showUpgradeMenu, setShowUpgradeMenu] = useState(false);
 
   // Handle row panel click - open modal
   const handleRowClick = (rowIndex: 0 | 1 | 2) => {
@@ -53,7 +55,7 @@ export const GameScreen = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <GameHUD />
       
-      <FactoryGrid onRowClick={handleRowClick} />
+      <FactoryGrid onRowClick={handleRowClick} onOpenUpgradeMenu={() => setShowUpgradeMenu(true)} />
       <ActionBar />
       
       {/* Offline earnings modal */}
@@ -72,6 +74,11 @@ export const GameScreen = () => {
           setFocusedRow(null);
         }}
         initialRow={focusedRow}
+      />
+
+      <UpgradeMenu
+        isOpen={showUpgradeMenu}
+        onClose={() => setShowUpgradeMenu(false)}
       />
     </div>
   );

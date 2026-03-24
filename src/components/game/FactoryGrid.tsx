@@ -9,6 +9,7 @@ import { MachineTileContent } from './MachineTileContent';
 
 interface FactoryGridProps {
   onRowClick?: (rowIndex: 0 | 1 | 2) => void;
+  onOpenUpgradeMenu?: () => void;
 }
 
 const DragPreview = () => {
@@ -46,7 +47,7 @@ const DragPreview = () => {
   );
 };
 
-const FactoryGridContent = ({ onRowClick }: FactoryGridProps) => {
+const FactoryGridContent = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps) => {
   const { state } = useGame();
 
   // Create array of 9 slots
@@ -60,7 +61,7 @@ const FactoryGridContent = ({ onRowClick }: FactoryGridProps) => {
       <div className="flex items-stretch gap-3">
         {/* Row module panel - aligned with grid rows */}
         {onRowClick && (
-          <RowModulePanel onRowClick={onRowClick} />
+          <RowModulePanel onRowClick={onRowClick} onOpenUpgradeMenu={onOpenUpgradeMenu} />
         )}
         
         {/* 3x3 Grid */}
@@ -79,8 +80,8 @@ const FactoryGridContent = ({ onRowClick }: FactoryGridProps) => {
   );
 };
 
-export const FactoryGrid = ({ onRowClick }: FactoryGridProps) => (
+export const FactoryGrid = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps) => (
   <MachineDragProvider>
-    <FactoryGridContent onRowClick={onRowClick} />
+    <FactoryGridContent onRowClick={onRowClick} onOpenUpgradeMenu={onOpenUpgradeMenu} />
   </MachineDragProvider>
 );
