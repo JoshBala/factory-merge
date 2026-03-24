@@ -1,16 +1,27 @@
 // === CENTRALIZED GAME BALANCE CONFIG ===
 // All tuning constants in one place. Modify these to adjust game progression.
 
+// === BASELINE ("RAW") VALUES ===
+// Keep raw design targets as standalone constants so upgrade-aware calculations
+// can reliably reference a single baseline source of truth.
+export const BASE_PRODUCTION_PER_SECOND = 1;
+export const BASE_PRODUCTION_GROWTH = 2.5;
+export const BASE_MACHINE_COST = 10;
+export const BASE_MACHINE_VALUE_GROWTH = 2.5;
+export const BASE_TICK_INTERVAL_MS = 1000;
+export const BASE_AUTO_SAVE_INTERVAL_MS = 10000;
+export const BASE_DISASTER_CHECK_INTERVAL_MS = 30000;
+
 export const BALANCE = {
   // === MACHINE PRODUCTION ===
   // Production formula: baseProductionPerSecond * (productionGrowth ^ (level - 1))
-  baseProductionPerSecond: 1,    // Lv1 produces $1/s
-  productionGrowth: 2.5,         // Each level is 2.5x the previous
+  baseProductionPerSecond: BASE_PRODUCTION_PER_SECOND, // Lv1 produces $1/s
+  productionGrowth: BASE_PRODUCTION_GROWTH,            // Each level is 2.5x the previous
 
   // === MACHINE COSTS & VALUE ===
   // Value formula: baseMachineCost * (valueGrowth ^ (level - 1))
-  baseMachineCost: 10,           // Cost to buy Lv1 machine
-  valueGrowth: 2.5,              // Each level is worth 2.5x the previous
+  baseMachineCost: BASE_MACHINE_COST,    // Cost to buy Lv1 machine
+  valueGrowth: BASE_MACHINE_VALUE_GROWTH, // Each level is worth 2.5x the previous
   scrapRefundMultiplier: 0.5,    // Scrap returns 50% of value
   repairCostMultiplier: 0.5,     // Repair costs 50% of value
 
@@ -18,9 +29,9 @@ export const BALANCE = {
   gridSize: 9,                   // 3x3 grid
 
   // === TIMING (milliseconds) ===
-  tickIntervalMs: 1000,          // Game tick every 1s
-  autoSaveIntervalMs: 10000,     // Autosave every 10s
-  disasterCheckIntervalMs: 30000, // Check for disaster every 30s
+  tickIntervalMs: BASE_TICK_INTERVAL_MS,             // Game tick every 1s
+  autoSaveIntervalMs: BASE_AUTO_SAVE_INTERVAL_MS,    // Autosave every 10s
+  disasterCheckIntervalMs: BASE_DISASTER_CHECK_INTERVAL_MS, // Check for disaster every 30s
 
   // === DISASTERS ===
   disasterChance: 0.15,          // 15% chance per check
