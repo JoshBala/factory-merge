@@ -41,16 +41,148 @@ const readUpgradePercent = (
     (state as Record<string, unknown>).upgradeStats,
   ];
 
-  for (const container of containers) {
-    if (!container || typeof container !== 'object') continue;
-    let total = 0;
-    for (const key of candidates) {
-      const value = readNumeric((container as Record<string, unknown>)[key]);
-      total += value;
+  return containers.reduce((total, container) => {
+    if (!container || typeof container !== 'object') return total;
+    return total + candidates.reduce(
+      (candidateTotal, key) => candidateTotal + readNumeric((container as Record<string, unknown>)[key]),
+      0
+    );
+  }, 0);
+};
+
+type RowIndex = 0 | 1 | 2;
+
+const EMPTY_ROW_BONUSES: Record<RowIndex, Record<BonusKind, number>> = {
+  0: {
+    productionPercent: 0,
+    productionAfterMerge: 0,
+    disasterDurationReduction: 0,
+    disasterChanceIncrease: 0,
+    disasterResolutionReward: 0,
+    upgradeCostReduction: 0,
+    automationSpeed: 0,
+    offlineEarningsPercent: 0,
+  },
+  1: {
+    productionPercent: 0,
+    productionAfterMerge: 0,
+    disasterDurationReduction: 0,
+    disasterChanceIncrease: 0,
+    disasterResolutionReward: 0,
+    upgradeCostReduction: 0,
+    automationSpeed: 0,
+    offlineEarningsPercent: 0,
+  },
+  2: {
+    productionPercent: 0,
+    productionAfterMerge: 0,
+    disasterDurationReduction: 0,
+    disasterChanceIncrease: 0,
+    disasterResolutionReward: 0,
+    upgradeCostReduction: 0,
+    automationSpeed: 0,
+    offlineEarningsPercent: 0,
+  },
+};
+
+export interface ResolvedGameEffects {
+  byKindPercent: Record<BonusKind, number>;
+  byRowPercent: Record<RowIndex, Record<BonusKind, number>>;
+  productionMultiplier: number;
+  mergedProductionMultiplier: number;
+  automationIntervalMs: number;
+  disasterChance: number;
+  disasterDurationMultiplier: number;
+  disasterResolutionRewardMultiplier: number;
+  offlineEfficiency: number;
+  machineCostMultiplier: number;
+}
+
+const resolveRowBonusPercents = (
+  rowModules: RowModule[]
+): Record<RowIndex, Record<BonusKind, number>> => {
+  const totals: Record<RowIndex, Record<BonusKind, number>> = {
+    0: { ...EMPTY_ROW_BONUSES[0] },
+    1: { ...EMPTY_ROW_BONUSES[1] },
+    2: { ...EMPTY_ROW_BONUSES[2] },
+  };
+
+  for (const module of rowModules) {
+    for (const bonus of module.bonuses) {
+      totals[module.rowIndex][bonus.kind] += calculateBonusValue(bonus);
     }
-    if (total !== 0) return total;
   }
-  return 0;
+
+  return totals;
+};
+
+const resolveGlobalUpgradePercents = (state?: UpgradeAwareState): Record<BonusKind, number> => ({
+  productionPercent: state
+    ? readUpgradePercent(state, ['productionPercent', 'productionMultiplierPercent', 'globalProductionPercent'])
+    : 0,
+  productionAfterMerge: state
+    ? readUpgradePercent(state, ['productionAfterMergePercent', 'postMergeProductionPercent'])
+    : 0,
+  disasterDurationReduction: state
+    ? readUpgradePercent(state, ['disasterDurationReduction', 'disasterDurationReductionPercent'])
+    : 0,
+  disasterChanceIncrease: state
+    ? readUpgradePercent(state, ['disasterChanceIncrease', 'disasterChanceIncreasePercent'])
+    : 0,
+  disasterResolutionReward: state
+    ? readUpgradePercent(state, ['disasterResolutionReward', 'disasterResolutionRewardPercent'])
+    : 0,
+  upgradeCostReduction: state
+    ? readUpgradePercent(state, ['upgradeCostReduction', 'upgradeCostReductionPercent', 'machineCostReductionPercent', 'machineCostDiscountPercent'])
+    : 0,
+  automationSpeed: state
+    ? readUpgradePercent(state, ['automationSpeedPercent', 'automationSpeed', 'tickSpeedPercent'])
+    : 0,
+  offlineEarningsPercent: state
+    ? readUpgradePercent(state, ['offlineEarningsPercent', 'offlineEfficiencyPercent'])
+    : 0,
+});
+
+export const resolveGameEffects = (
+  rowModules: RowModule[] = [],
+  state?: UpgradeAwareState
+): ResolvedGameEffects => {
+  const rowBonusPercents = resolveRowBonusPercents(rowModules);
+  const upgradePercents = resolveGlobalUpgradePercents(state);
+  const byKindPercent = Object.keys(EMPTY_ROW_BONUSES[0]).reduce((acc, key) => {
+    const kind = key as BonusKind;
+    acc[kind] =
+      upgradePercents[kind] +
+      rowBonusPercents[0][kind] +
+      rowBonusPercents[1][kind] +
+      rowBonusPercents[2][kind];
+    return acc;
+  }, { ...EMPTY_ROW_BONUSES[0] });
+
+  const productionMultiplier = Math.max(0, 1 + byKindPercent.productionPercent / 100);
+  const mergedProductionMultiplier = Math.max(
+    0,
+    productionMultiplier * (1 + byKindPercent.productionAfterMerge / 100)
+  );
+  const automationIntervalMs = BASE_TICK_INTERVAL_MS / Math.max(0.05, 1 + byKindPercent.automationSpeed / 100);
+  const disasterChance = Math.min(0.95, Math.max(0, GAME_CONFIG.disasterChance * (1 + byKindPercent.disasterChanceIncrease / 100)));
+  const disasterDurationMultiplier = Math.max(0.2, 1 - Math.min(80, Math.max(0, byKindPercent.disasterDurationReduction)) / 100);
+  const disasterResolutionRewardMultiplier = Math.max(0, 1 + byKindPercent.disasterResolutionReward / 100);
+  const offlineEfficiency = Math.min(1, Math.max(0, BALANCE.offlineEfficiency * (1 + byKindPercent.offlineEarningsPercent / 100)));
+  const machineCostMultiplier = 1 - Math.min(95, Math.max(0, byKindPercent.upgradeCostReduction)) / 100;
+
+  return {
+    byKindPercent,
+    byRowPercent: rowBonusPercents,
+    productionMultiplier,
+    mergedProductionMultiplier,
+    automationIntervalMs,
+    disasterChance,
+    disasterDurationMultiplier,
+    disasterResolutionRewardMultiplier,
+    offlineEfficiency,
+    machineCostMultiplier,
+  };
 };
 
 /**
@@ -60,13 +192,7 @@ const readUpgradePercent = (
 export const getEffectiveAutomationInterval = (
   state: UpgradeAwareState
 ): number => {
-  const automationSpeedPercent = readUpgradePercent(state, [
-    'automationSpeedPercent',
-    'automationSpeed',
-    'tickSpeedPercent',
-  ]);
-  const speedMultiplier = Math.max(0.05, 1 + automationSpeedPercent / 100);
-  return BASE_TICK_INTERVAL_MS / speedMultiplier;
+  return resolveGameEffects(state.rowModules ?? [], state).automationIntervalMs;
 };
 
 /**
@@ -125,13 +251,7 @@ export const getEffectiveBaseCellCreationRate = (
  * Formula: baseMachineCost * (1 - totalDiscount%)
  */
 export const getEffectiveMachineCost = (state: UpgradeAwareState): number => {
-  const discountPercent = readUpgradePercent(state, [
-    'machineCostReductionPercent',
-    'machineCostDiscountPercent',
-    'upgradeCostReduction',
-  ]);
-  const clampedDiscount = Math.min(95, Math.max(0, discountPercent));
-  return BASE_MACHINE_COST * (1 - clampedDiscount / 100);
+  return BASE_MACHINE_COST * resolveGameEffects(state.rowModules ?? [], state).machineCostMultiplier;
 };
 
 // === ROW MODULE HELPERS ===
@@ -259,16 +379,9 @@ export const getRowProductionBonus = (
   rowModules: RowModule[],
   rowIndex: number
 ): number => {
-  const module = rowModules.find(m => m.rowIndex === rowIndex);
-  if (!module) return 0;
-  
-  let totalBonus = 0;
-  for (const bonus of module.bonuses) {
-    if (bonus.kind === 'productionPercent') {
-      totalBonus += calculateBonusValue(bonus);
-    }
-  }
-  return totalBonus / 100; // Convert percentage to multiplier
+  const row = Math.max(0, Math.min(2, rowIndex)) as RowIndex;
+  const effects = resolveGameEffects(rowModules);
+  return effects.byRowPercent[row].productionPercent / 100; // Convert percentage to multiplier
 };
 
 // Calculate disaster duration reduction for a specific row
@@ -276,16 +389,9 @@ export const getDisasterDurationReduction = (
   rowModules: RowModule[],
   rowIndex: number
 ): number => {
-  const module = rowModules.find(m => m.rowIndex === rowIndex);
-  if (!module) return 0;
-  
-  let totalReduction = 0;
-  for (const bonus of module.bonuses) {
-    if (bonus.kind === 'disasterDurationReduction') {
-      totalReduction += calculateBonusValue(bonus);
-    }
-  }
-  return totalReduction / 100; // Convert percentage to multiplier
+  const row = Math.max(0, Math.min(2, rowIndex)) as RowIndex;
+  const effects = resolveGameEffects(rowModules);
+  return effects.byRowPercent[row].disasterDurationReduction / 100; // Convert percentage to multiplier
 };
 
 // === PRODUCTION CALCULATIONS ===
@@ -300,14 +406,15 @@ export const calculateProductionRate = (
   rowModules: RowModule[] = []
 ): number => {
   if (isPowerOutage) return 0;
-  
+  const effects = resolveGameEffects(rowModules);
   return machines.reduce((total, machine) => {
     if (machine.disabled) return total;
     // Use procedural production rate from balance config
     const baseRate = getProductionRate(machine.level);
     const rowIndex = getRowForSlot(machine.slotIndex);
-    const bonus = getRowProductionBonus(rowModules, rowIndex);
-    return total + baseRate * (1 + bonus);
+    const rowBonusMultiplier = 1 + effects.byRowPercent[rowIndex].productionPercent / 100;
+    const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
+    return total + baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
   }, 0);
 };
 
@@ -335,20 +442,29 @@ export const calculateEarnings = (
 // Calculate offline earnings with efficiency penalty
 export const calculateOfflineEarnings = (
   machines: Machine[],
-  lastTickTime: number
+  lastTickTime: number,
+  rowModules: RowModule[] = [],
+  state?: UpgradeAwareState
 ): { earnings: number; timeAway: number } => {
   const now = Date.now();
   const maxOfflineMs = BALANCE.maxOfflineHours * 60 * 60 * 1000;
   const timeAway = Math.min(now - lastTickTime, maxOfflineMs);
+  const effects = resolveGameEffects(rowModules, state);
   
   // Assume no disasters while offline, all machines functional
   const activeMachines = machines.filter(m => !m.disabled);
   const rate = activeMachines.reduce(
-    (total, m) => total + getProductionRate(m.level),
+    (total, m) => {
+      const baseRate = getProductionRate(m.level);
+      const rowIndex = getRowForSlot(m.slotIndex);
+      const rowBonusMultiplier = 1 + effects.byRowPercent[rowIndex].productionPercent / 100;
+      const mergeBonusMultiplier = m.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
+      return total + baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
+    },
     0
   );
   
-  const earnings = (rate * timeAway * BALANCE.offlineEfficiency) / 1000;
+  const earnings = (rate * timeAway * effects.offlineEfficiency) / 1000;
   return { earnings: Math.floor(earnings), timeAway };
 };
 
