@@ -1,11 +1,14 @@
 // === GAME CALCULATIONS ===
 import { 
   Machine, GAME_CONFIG, 
-  RowModule, Rarity, BonusKind, RowBonus,
+  RowModule, Rarity, BonusKind, RowBonus, GameState,
   BONUS_RANGES, RARITY_BONUS_COUNT 
 } from '@/types/game';
 import { 
   BALANCE, 
+  BASE_MACHINE_COST,
+  BASE_PRODUCTION_PER_SECOND,
+  BASE_TICK_INTERVAL_MS,
   getProductionRate, 
   getScrapRefund as getScrapRefundFromBalance,
   getRepairCostFromLevel 
@@ -14,6 +17,122 @@ import {
 // Generate unique ID for machines
 export const generateId = (): string => 
   `m_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+// === UPGRADE-AWARE BASE STAT RESOLVERS ===
+/**
+ * Stacking model used by all resolvers below:
+ * 1) Percentage bonuses of the same family stack additively (e.g. +10% and +15% = +25%).
+ * 2) Distinct multiplicative layers multiply together at the end.
+ * 3) Discounts/reductions are clamped to [0%, 95%] to avoid invalid negative values.
+ */
+type UpgradeAwareState = GameState & Record<string, unknown>;
+
+const readNumeric = (value: unknown): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : 0;
+
+const readUpgradePercent = (
+  state: UpgradeAwareState,
+  candidates: string[]
+): number => {
+  const containers = [
+    state,
+    (state as Record<string, unknown>).upgrades,
+    (state as Record<string, unknown>).upgradeEffects,
+    (state as Record<string, unknown>).upgradeStats,
+  ];
+
+  for (const container of containers) {
+    if (!container || typeof container !== 'object') continue;
+    let total = 0;
+    for (const key of candidates) {
+      const value = readNumeric((container as Record<string, unknown>)[key]);
+      total += value;
+    }
+    if (total !== 0) return total;
+  }
+  return 0;
+};
+
+/**
+ * Effective automation interval in milliseconds.
+ * Formula: baseIntervalMs / (1 + totalAutomationSpeed%)
+ */
+export const getEffectiveAutomationInterval = (
+  state: UpgradeAwareState
+): number => {
+  const automationSpeedPercent = readUpgradePercent(state, [
+    'automationSpeedPercent',
+    'automationSpeed',
+    'tickSpeedPercent',
+  ]);
+  const speedMultiplier = Math.max(0.05, 1 + automationSpeedPercent / 100);
+  return BASE_TICK_INTERVAL_MS / speedMultiplier;
+};
+
+/**
+ * Effective global production multiplier.
+ * Formula: (1 + totalProductionBonus%) * explicitMultipliers
+ */
+export const getEffectiveProductionMultiplier = (
+  state: UpgradeAwareState
+): number => {
+  const productionPercent = readUpgradePercent(state, [
+    'productionPercent',
+    'productionMultiplierPercent',
+    'globalProductionPercent',
+  ]);
+
+  const explicitMultiplier = Math.max(
+    0,
+    readUpgradePercent(state, ['productionMultiplier', 'globalProductionMultiplier']) || 1
+  );
+
+  return Math.max(0, 1 + productionPercent / 100) * explicitMultiplier;
+};
+
+/**
+ * Effective Lv1 machine output after upgrade effects.
+ * Formula: baseMachineOutput * effectiveProductionMultiplier
+ */
+export const getEffectiveBaseMachineOutput = (
+  state: UpgradeAwareState
+): number => {
+  return BASE_PRODUCTION_PER_SECOND * getEffectiveProductionMultiplier(state);
+};
+
+/**
+ * Effective base resource ("cell") generation rate.
+ * If no dedicated cell generator baseline exists in state, this falls back to
+ * the effective base machine output so callers always receive a stable value.
+ */
+export const getEffectiveBaseCellCreationRate = (
+  state: UpgradeAwareState
+): number => {
+  const baseCellRate =
+    readUpgradePercent(state, ['baseCellCreationRate', 'cellCreationBaseRate']) ||
+    getEffectiveBaseMachineOutput(state);
+
+  const cellRatePercent = readUpgradePercent(state, [
+    'cellCreationRatePercent',
+    'cellCreationPercent',
+  ]);
+
+  return baseCellRate * Math.max(0, 1 + cellRatePercent / 100);
+};
+
+/**
+ * Effective machine purchase cost after discount effects.
+ * Formula: baseMachineCost * (1 - totalDiscount%)
+ */
+export const getEffectiveMachineCost = (state: UpgradeAwareState): number => {
+  const discountPercent = readUpgradePercent(state, [
+    'machineCostReductionPercent',
+    'machineCostDiscountPercent',
+    'upgradeCostReduction',
+  ]);
+  const clampedDiscount = Math.min(95, Math.max(0, discountPercent));
+  return BASE_MACHINE_COST * (1 - clampedDiscount / 100);
+};
 
 // === ROW MODULE HELPERS ===
 
