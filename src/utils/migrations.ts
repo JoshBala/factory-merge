@@ -39,6 +39,7 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
 export const migrateGameState = (state: GameState): GameState => ({
   ...state,
   saveVersion: state.saveVersion ?? 0,
+  ownedUpgrades: state.ownedUpgrades ?? {},
   stats: {
     lifetimeCurrencyEarned: state.stats?.lifetimeCurrencyEarned ?? 0,
     lifetimeMachinesBought: state.stats?.lifetimeMachinesBought ?? 0,

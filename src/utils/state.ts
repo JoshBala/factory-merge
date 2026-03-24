@@ -9,6 +9,7 @@ export const createInitialState = (): GameState => ({
   lastTickTime: Date.now(),
   totalPlayTime: 0,
   rowModules: [], // No modules initially
+  ownedUpgrades: {},
   stats: {
     lifetimeCurrencyEarned: 0,
     lifetimeMachinesBought: 0,

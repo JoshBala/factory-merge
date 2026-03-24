@@ -53,6 +53,8 @@ export interface GameStats {
   highestMachineLevel: number;
 }
 
+export type UpgradeId = string;
+
 export interface GameState {
   currency: number;
   machines: Machine[];
@@ -61,6 +63,7 @@ export interface GameState {
   lastTickTime: number;
   totalPlayTime: number;
   rowModules: RowModule[]; // 0-3 modules, one per row
+  ownedUpgrades: Record<string, number>;
   stats: GameStats;
   saveVersion?: number;
 }

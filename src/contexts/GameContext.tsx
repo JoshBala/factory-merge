@@ -11,6 +11,81 @@ import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
 import { createInitialState } from '@/utils/state';
 
+type UpgradeCost = {
+  amount?: number;
+  currency?: number;
+  resource?: string;
+  resourceType?: string;
+};
+
+type UnlockRequirements = {
+  minCurrency?: number;
+  minTotalPlayTime?: number;
+  minHighestMachineLevel?: number;
+  requiredUpgrades?: Record<string, number>;
+};
+
+type UpgradeDefinition = {
+  id?: string;
+  cost?: number | UpgradeCost;
+  unlockRequirements?: UnlockRequirements;
+  maxLevel?: number;
+};
+
+const getUpgradeDefinitions = (state: GameState): Record<string, UpgradeDefinition> => {
+  const unknownState = state as GameState & Record<string, unknown>;
+  const fromCatalog = unknownState.upgradeCatalog;
+  const fromDefinitions = unknownState.upgradeDefinitions;
+
+  if (fromCatalog && typeof fromCatalog === 'object') {
+    return fromCatalog as Record<string, UpgradeDefinition>;
+  }
+  if (fromDefinitions && typeof fromDefinitions === 'object') {
+    return fromDefinitions as Record<string, UpgradeDefinition>;
+  }
+  return {};
+};
+
+const parseUpgradeCost = (cost: UpgradeDefinition['cost']): { amount: number; resourceKey: string } => {
+  if (typeof cost === 'number') {
+    return { amount: cost, resourceKey: 'currency' };
+  }
+  if (!cost) {
+    return { amount: 0, resourceKey: 'currency' };
+  }
+
+  const resourceKey = cost.resourceType || cost.resource || 'currency';
+  const amount = cost.amount ?? cost.currency ?? 0;
+  return { amount, resourceKey };
+};
+
+const meetsUnlockRequirements = (state: GameState, requirements?: UnlockRequirements): boolean => {
+  if (!requirements) return true;
+
+  if (typeof requirements.minCurrency === 'number' && state.currency < requirements.minCurrency) {
+    return false;
+  }
+  if (typeof requirements.minTotalPlayTime === 'number' && state.totalPlayTime < requirements.minTotalPlayTime) {
+    return false;
+  }
+  if (
+    typeof requirements.minHighestMachineLevel === 'number' &&
+    state.stats.highestMachineLevel < requirements.minHighestMachineLevel
+  ) {
+    return false;
+  }
+
+  if (requirements.requiredUpgrades) {
+    for (const [requiredUpgradeId, requiredLevel] of Object.entries(requirements.requiredUpgrades)) {
+      if ((state.ownedUpgrades[requiredUpgradeId] ?? 0) < requiredLevel) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
 // === REDUCER ===
 const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
@@ -268,6 +343,49 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
     }
 
+    case 'BUY_UPGRADE': {
+      const upgradeDefinitions = getUpgradeDefinitions(state);
+      const definition = upgradeDefinitions[action.upgradeId];
+      if (!definition) return state;
+
+      if (!meetsUnlockRequirements(state, definition.unlockRequirements)) return state;
+
+      const currentLevel = state.ownedUpgrades[action.upgradeId] ?? 0;
+      const maxLevel = definition.maxLevel ?? 1;
+      if (currentLevel >= maxLevel) return state;
+
+      const { amount, resourceKey } = parseUpgradeCost(definition.cost);
+      if (amount < 0) return state;
+
+      const stateWithDynamic = state as GameState & Record<string, unknown>;
+      const currentResource =
+        resourceKey === 'currency'
+          ? state.currency
+          : typeof stateWithDynamic[resourceKey] === 'number'
+            ? (stateWithDynamic[resourceKey] as number)
+            : 0;
+      if (currentResource < amount) return state;
+
+      const nextOwnedUpgrades = {
+        ...state.ownedUpgrades,
+        [action.upgradeId]: Math.min(currentLevel + 1, maxLevel),
+      };
+
+      if (resourceKey === 'currency') {
+        return {
+          ...state,
+          currency: state.currency - amount,
+          ownedUpgrades: nextOwnedUpgrades,
+        };
+      }
+
+      return {
+        ...state,
+        ownedUpgrades: nextOwnedUpgrades,
+        [resourceKey]: currentResource - amount,
+      } as GameState;
+    }
+
     default:
       return state;
   }
@@ -284,6 +402,7 @@ interface GameContextType {
     repairMachine: (id: string) => void;
     resetGame: () => void;
     upgradeRow: (rowIndex: 0 | 1 | 2) => void;
+    buyUpgrade: (upgradeId: string) => void;
     rerollBonus: (rowIndex: 0 | 1 | 2) => void;
     toggleBonusLock: (rowIndex: 0 | 1 | 2, bonusIndex: number) => void;
     moveMachine: (machineId: string, targetSlot: number) => void;
@@ -333,6 +452,8 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'RESET_GAME' }), []),
     upgradeRow: useCallback((rowIndex: 0 | 1 | 2) =>
       dispatch({ type: 'UPGRADE_ROW', rowIndex }), []),
+    buyUpgrade: useCallback((upgradeId: string) =>
+      dispatch({ type: 'BUY_UPGRADE', upgradeId }), []),
     rerollBonus: useCallback((rowIndex: 0 | 1 | 2) =>
       dispatch({ type: 'REROLL_ROW_BONUSES', rowIndex }), []),
     toggleBonusLock: useCallback((rowIndex: 0 | 1 | 2, bonusIndex: number) =>
