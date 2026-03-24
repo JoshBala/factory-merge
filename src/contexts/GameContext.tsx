@@ -10,6 +10,7 @@ import {
 import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
 import { createInitialState } from '@/utils/state';
+import { UPGRADE_BY_ID } from '@/config/upgrades';
 
 type DynamicState = GameState & Record<string, unknown>;
 
@@ -121,6 +122,19 @@ const applyUpgradeCost = (state: DynamicState, costs: Record<string, number>): D
   }
 
   return nextState;
+};
+
+
+const resolveCatalogUpgradeCost = (upgradeId: string, currentLevel: number): number | null => {
+  const definition = UPGRADE_BY_ID[upgradeId];
+  if (!definition || currentLevel >= definition.maxLevel) return null;
+
+  if (definition.costGrowth.kind === "exponential") {
+    return Math.round(definition.baseCost * Math.pow(definition.costGrowth.factor, currentLevel));
+  }
+
+  const levelFactor = Math.pow(currentLevel + 1, definition.costGrowth.power);
+  return Math.round(definition.baseCost + levelFactor * definition.baseCost * 0.22 * definition.costGrowth.scale);
 };
 
 // === REDUCER ===
@@ -387,10 +401,27 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'BUY_UPGRADE': {
       const dynamicState = state as DynamicState;
       const ownedUpgrades = readOwnedUpgrades(dynamicState);
+      const currentLevel = ownedUpgrades[action.upgradeId] ?? 0;
+
+      const catalogUpgrade = UPGRADE_BY_ID[action.upgradeId];
+      if (catalogUpgrade) {
+        if (currentLevel >= catalogUpgrade.maxLevel) return state;
+        const cost = resolveCatalogUpgradeCost(action.upgradeId, currentLevel);
+        if (cost === null || state.currency < cost) return state;
+
+        return {
+          ...state,
+          currency: state.currency - cost,
+          ownedUpgrades: {
+            ...ownedUpgrades,
+            [action.upgradeId]: currentLevel + 1,
+          },
+        } as GameState;
+      }
+
       const definition = readUpgradeDefinition(dynamicState, action.upgradeId);
       if (!definition) return state;
 
-      const currentLevel = ownedUpgrades[action.upgradeId] ?? 0;
       const maxLevel = definition.maxLevel ?? Number.POSITIVE_INFINITY;
       if (currentLevel >= maxLevel) return state;
       if (!meetsUnlockRequirements(definition, ownedUpgrades)) return state;
