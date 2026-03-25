@@ -281,6 +281,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currency: state.currency - BALANCE.baseMachineCost,
         machines: [...state.machines, newMachine],
+        automation: {
+          ...state.automation,
+          runtime: {
+            ...state.automation.runtime,
+            triggerFlags: {
+              ...state.automation.runtime.triggerFlags,
+              afterBuyMachine: true,
+            },
+          },
+        },
         stats: {
           ...state.stats,
           lifetimeMachinesBought: state.stats.lifetimeMachinesBought + 1,
@@ -315,6 +325,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         machines: state.machines
           .filter(m => m.id !== source.id && m.id !== target.id)
           .concat(mergedMachine),
+        automation: {
+          ...state.automation,
+          runtime: {
+            ...state.automation.runtime,
+            triggerFlags: {
+              ...state.automation.runtime.triggerFlags,
+              afterMergeMachines: true,
+            },
+          },
+        },
         selectedMachineId: null,
         stats: {
           ...state.stats,
@@ -471,6 +491,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         machines: state.machines.map(m =>
           m.id === action.machineId ? { ...m, slotIndex: action.targetSlot } : m
         ),
+        automation: {
+          ...state.automation,
+          runtime: {
+            ...state.automation.runtime,
+            triggerFlags: {
+              ...state.automation.runtime.triggerFlags,
+              afterScrapOrMoveMachine: true,
+            },
+          },
+        },
         selectedMachineId: null,
       };
     }
@@ -486,6 +516,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         ...state,
         currency: state.currency + refund,
         machines: state.machines.filter(m => m.id !== action.machineId),
+        automation: {
+          ...state.automation,
+          runtime: {
+            ...state.automation.runtime,
+            triggerFlags: {
+              ...state.automation.runtime.triggerFlags,
+              afterScrapOrMoveMachine: true,
+            },
+          },
+        },
         selectedMachineId: null,
         // If scrapping a burning machine, clear the fire
         activeDisaster: state.activeDisaster?.targetSlot === machine.slotIndex 
@@ -651,6 +691,31 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       }
 
       return withAttempt;
+    }
+
+    case 'CONSUME_AUTOMATION_TRIGGERS': {
+      if (
+        !state.automation.runtime.triggerFlags.afterBuyMachine &&
+        !state.automation.runtime.triggerFlags.afterMergeMachines &&
+        !state.automation.runtime.triggerFlags.afterScrapOrMoveMachine
+      ) {
+        return state;
+      }
+
+      return {
+        ...state,
+        automation: {
+          ...state.automation,
+          runtime: {
+            ...state.automation.runtime,
+            triggerFlags: {
+              afterBuyMachine: false,
+              afterMergeMachines: false,
+              afterScrapOrMoveMachine: false,
+            },
+          },
+        },
+      };
     }
 
     case 'RECORD_AUTOMATION_BLOCKED': {

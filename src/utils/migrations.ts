@@ -70,6 +70,11 @@ const migrateAutomationState = (automation: Partial<GameState>['automation']): G
         typeof runtime?.opsPerTickBudget === 'number' && Number.isFinite(runtime.opsPerTickBudget) && runtime.opsPerTickBudget > 0
           ? Math.floor(runtime.opsPerTickBudget)
           : 1,
+      triggerFlags: {
+        afterBuyMachine: Boolean(runtime?.triggerFlags?.afterBuyMachine),
+        afterMergeMachines: Boolean(runtime?.triggerFlags?.afterMergeMachines),
+        afterScrapOrMoveMachine: Boolean(runtime?.triggerFlags?.afterScrapOrMoveMachine),
+      },
       debugMetrics: {
         attemptedOps:
           typeof runtime?.debugMetrics?.attemptedOps === 'number' && Number.isFinite(runtime.debugMetrics.attemptedOps)

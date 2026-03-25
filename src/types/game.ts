@@ -73,6 +73,11 @@ export interface AutomationRuntime {
   lastRunAt: number | null;
   pendingQueue: string[];
   opsPerTickBudget: number;
+  triggerFlags: {
+    afterBuyMachine: boolean;
+    afterMergeMachines: boolean;
+    afterScrapOrMoveMachine: boolean;
+  };
   debugMetrics?: AutomationDebugMetrics;
 }
 
@@ -228,4 +233,5 @@ export type GameAction =
   | { type: 'REMOVE_AUTOMATION_RULE'; ruleId: string }
   | { type: 'TOGGLE_AUTOMATION'; enabled?: boolean }
   | { type: 'RUN_AUTOMATION_OPS'; ops: AutomationOp[] }
+  | { type: 'CONSUME_AUTOMATION_TRIGGERS' }
   | { type: 'RECORD_AUTOMATION_BLOCKED'; reason: AutomationBlockedReason };

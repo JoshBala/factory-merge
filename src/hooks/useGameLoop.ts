@@ -45,6 +45,11 @@ const isAutomationBlockedByDisaster = (state: GameState): boolean => {
   return state.activeDisaster?.type === 'powerOutage';
 };
 
+const hasAutomationTrigger = (state: GameState): boolean => {
+  const flags = state.automation.runtime.triggerFlags;
+  return flags.afterBuyMachine || flags.afterMergeMachines || flags.afterScrapOrMoveMachine;
+};
+
 export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
   const lastFrameRef = useRef<number | null>(null);
   const lastDisasterCheckRef = useRef(Date.now());
@@ -96,58 +101,6 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
       if (accumulatedTimeRef.current >= uiUpdateIntervalSeconds) {
         const deltaMs = accumulatedTimeRef.current * 1000;
         accumulatedTimeRef.current = 0;
-        const currentState = stateRef.current;
-        const plannedOps = planAutomationOpsFromGameState(currentState, now);
-        const firstOp = plannedOps[0];
-
-        if (firstOp) {
-          if (firstOp.kind === 'SKIP') {
-            const blockedReason =
-              firstOp.reason === 'RULE_COOLDOWN'
-                ? 'cooldown'
-                : firstOp.reason === 'AUTOMATION_DISABLED' || firstOp.reason === 'RULE_DISABLED'
-                  ? 'disabled'
-                  : firstOp.reason === 'NO_VALID_TARGET' && currentState.machines.length >= GAME_CONFIG.gridSize
-                    ? 'full_grid'
-                    : 'no_match';
-            dispatch({ type: 'RECORD_AUTOMATION_BLOCKED', reason: blockedReason });
-            if (import.meta.env.DEV) {
-              console.debug('[automation] blocked', {
-                reason: blockedReason,
-                rawReason: firstOp.reason,
-                ruleId: firstOp.ruleId,
-              });
-            }
-          } else if (import.meta.env.DEV) {
-            console.debug('[automation] op', {
-              kind: firstOp.kind,
-              ruleId: firstOp.ruleId,
-            });
-          }
-
-          if (firstOp.kind === 'MERGE') {
-            dispatch({
-              type: 'RUN_AUTOMATION_OPS',
-              ops: [{
-                type: 'merge_machines',
-                sourceId: firstOp.sourceId,
-                targetId: firstOp.targetId,
-                ruleId: firstOp.ruleId,
-              }],
-            });
-          } else if (firstOp.kind === 'MOVE') {
-            dispatch({
-              type: 'RUN_AUTOMATION_OPS',
-              ops: [{
-                type: 'move_machine',
-                machineId: firstOp.machineId,
-                targetSlot: firstOp.targetSlot,
-                ruleId: firstOp.ruleId,
-              }],
-            });
-          }
-        }
-
         // Production tick
         dispatch({ type: 'TICK', deltaMs });
       }
@@ -158,28 +111,48 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
         // Resolve row + upgrade effects exactly once per scheduling cycle
         const rowEffects = resolveGameEffects(currentState.rowModules, currentState);
         const automationIntervalMs = rowEffects.automationIntervalMs;
+        const fullBudget = Math.max(1, Math.floor(currentState.automation.runtime.opsPerTickBudget || 1));
+        let remainingBudget = fullBudget;
 
-        if (automationAccumulatedMsRef.current >= automationIntervalMs) {
+        const runAutomationPass = (stateSnapshot: GameState): number => {
+          if (remainingBudget <= 0) return 0;
+
           const upgradeEffects =
-            currentState.upgradeEffectProjection ??
-            resolveUpgradeEffects(currentState.ownedUpgrades, currentState.machines);
+            stateSnapshot.upgradeEffectProjection ??
+            resolveUpgradeEffects(stateSnapshot.ownedUpgrades, stateSnapshot.machines);
 
           const plannedOps = planAutomationOps(
-            currentState,
+            stateSnapshot,
             {
-              ...currentState.automation,
+              ...stateSnapshot.automation,
               runtime: {
-                ...currentState.automation.runtime,
-                opsPerTickBudget: 1,
+                ...stateSnapshot.automation.runtime,
+                opsPerTickBudget: remainingBudget,
               },
             },
             upgradeEffects,
             now
           );
 
-          const ops = mapPlannedOpsToActions(plannedOps, 1);
+          const ops = mapPlannedOpsToActions(plannedOps, remainingBudget);
           if (ops.length > 0) {
-            dispatch({ type: 'RUN_AUTOMATION_OPS', ops });
+            dispatch({ type: 'RUN_AUTOMATION_OPS', ops: [ops[0]] });
+            remainingBudget -= 1;
+            return 1;
+          }
+
+          return 0;
+        };
+
+        // Consume trigger flags to allow an earlier automation pass in deterministic order.
+        if (hasAutomationTrigger(currentState)) {
+          dispatch({ type: 'CONSUME_AUTOMATION_TRIGGERS' });
+          runAutomationPass(currentState);
+        }
+
+        if (automationAccumulatedMsRef.current >= automationIntervalMs) {
+          if (remainingBudget > 0) {
+            runAutomationPass(currentState);
           }
 
           // Never loop to exhaustion in one frame.
