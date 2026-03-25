@@ -237,7 +237,7 @@ const UPGRADE_BLUEPRINTS: Array<{
         : `Add mild carry-forward multipliers for Tier ${tier}.`,
     unlockBuilder: (tier) => ({
       requiresUpgrades: [`u_t${tier}_mesh_network`],
-      requiresTierComplete: Math.max(1, tier - 1),
+      requiresTierComplete: Math.max(0, tier - 1),
       requiresCurrencyTotal: Math.round(550 * Math.pow(1.83, tier - 1)),
       requiresMachineLevel: tier + 2,
     }),
