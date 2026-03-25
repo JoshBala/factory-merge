@@ -48,30 +48,30 @@ const getUpgradeCost = (upgrade: UpgradeDefinition, currentLevel: number) => {
   return Math.round(upgrade.baseCost + levelFactor * upgrade.baseCost * 0.22 * upgrade.costGrowth.scale);
 };
 
-const formatEffect = (effect: UpgradeDefinition['effects'][number], nextLevel: number): string => {
+const formatEffectAtLevel = (effect: UpgradeDefinition['effects'][number], level: number): string => {
   switch (effect.type) {
     case 'automation_tick_rate':
-      return `+${(effect.percentPerLevel * nextLevel).toFixed(1)}% automation tick rate`;
+      return `+${(effect.percentPerLevel * level).toFixed(1)}% automation tick rate`;
     case 'base_generation_flat':
-      return `+${Math.round(effect.amountPerLevel * nextLevel)} base generation`;
+      return `+${Math.round(effect.amountPerLevel * level)} base generation`;
     case 'base_generation_percent':
-      return `+${(effect.percentPerLevel * nextLevel).toFixed(1)}% base generation`;
+      return `+${(effect.percentPerLevel * level).toFixed(1)}% base generation`;
     case 'throughput_percent':
-      return `+${(effect.percentPerLevel * nextLevel).toFixed(1)}% throughput`;
+      return `+${(effect.percentPerLevel * level).toFixed(1)}% throughput`;
     case 'merge_quality_percent':
-      return `+${(effect.percentPerLevel * nextLevel).toFixed(1)}% merge quality`;
+      return `+${(effect.percentPerLevel * level).toFixed(1)}% merge quality`;
     case 'offline_storage_hours':
-      return `+${(effect.hoursPerLevel * nextLevel).toFixed(1)}h offline storage`;
+      return `+${(effect.hoursPerLevel * level).toFixed(1)}h offline storage`;
     case 'cost_reduction_percent':
-      return `-${(effect.percentPerLevel * nextLevel).toFixed(1)}% ${effect.target} costs`;
+      return `-${(effect.percentPerLevel * level).toFixed(1)}% ${effect.target} costs`;
     case 'machine_level_bonus':
-      return `+${effect.levelBonusPerLevel * nextLevel} level for ${effect.machineId}`;
+      return `+${effect.levelBonusPerLevel * level} level for ${effect.machineId}`;
     case 'synergy_per_owned_machine':
-      return `+${(effect.percentPerMachine * nextLevel).toFixed(2)}% per owned machine`;
+      return `+${(effect.percentPerMachine * level).toFixed(2)}% per owned machine`;
     case 'tier_multiplier':
-      return `+${(effect.multiplierPerLevel * nextLevel * 100).toFixed(1)}% tier ${effect.targetTier} multiplier`;
+      return `+${(effect.multiplierPerLevel * level * 100).toFixed(1)}% tier ${effect.targetTier} multiplier`;
     case 'prestige_compounding':
-      return `+${(effect.percentPerReset * nextLevel).toFixed(1)}% per reset`;
+      return `+${(effect.percentPerReset * level).toFixed(1)}% per reset`;
     default:
       return 'Effect scales with level';
   }
@@ -271,7 +271,20 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
                       </div>
 
                       <p className="text-xs text-muted-foreground">{upgrade.description}</p>
-                      <p className="text-xs"><span className="text-muted-foreground">Next effect:</span> {formatEffect(upgrade.effects[0], nextLevel)}</p>
+                      <p className="text-xs">
+                        {atMax ? (
+                          <>
+                            <span className="text-muted-foreground">Current effect:</span>{' '}
+                            {formatEffectAtLevel(upgrade.effects[0], currentLevel)}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-muted-foreground">Effect:</span>{' '}
+                            {formatEffectAtLevel(upgrade.effects[0], currentLevel)} →{' '}
+                            {formatEffectAtLevel(upgrade.effects[0], nextLevel)}
+                          </>
+                        )}
+                      </p>
 
                       <div className="text-xs text-muted-foreground">Cost: {atMax ? 'MAX' : formatCurrency(cost)}</div>
 
