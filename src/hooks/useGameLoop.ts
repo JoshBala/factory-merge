@@ -1,18 +1,55 @@
 // === GAME LOOP HOOK ===
-// Handles production ticks and disaster generation
+// Handles production ticks, disaster generation, and automation scheduling
 import { useEffect, useRef } from 'react';
 import { GameState, GameAction, Disaster, GAME_CONFIG, RowModule } from '@/types/game';
 import { randomInRange, resolveGameEffects } from '@/utils/calculations';
+import { planAutomationOps } from '@/utils/automationPlanner';
+import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
 
 interface UseGameLoopProps {
   state: GameState;
   dispatch: React.Dispatch<GameAction>;
 }
 
+const mapPlannedOpsToActions = (
+  ops: ReturnType<typeof planAutomationOps>,
+  maxOps: number
+): GameAction['ops'] => {
+  const actionableOps: GameAction['ops'] = [];
+
+  for (const op of ops) {
+    if (actionableOps.length >= maxOps) break;
+
+    if (op.kind === 'MERGE') {
+      actionableOps.push({
+        type: 'merge_machines',
+        sourceId: op.sourceId,
+        targetId: op.targetId,
+      });
+      continue;
+    }
+
+    if (op.kind === 'MOVE') {
+      actionableOps.push({
+        type: 'move_machine',
+        machineId: op.machineId,
+        targetSlot: op.targetSlot,
+      });
+    }
+  }
+
+  return actionableOps;
+};
+
+const isAutomationBlockedByDisaster = (state: GameState): boolean => {
+  return state.activeDisaster?.type === 'powerOutage';
+};
+
 export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
   const lastFrameRef = useRef<number | null>(null);
   const lastDisasterCheckRef = useRef(Date.now());
   const accumulatedTimeRef = useRef(0);
+  const automationAccumulatedMsRef = useRef(0);
   const animationFrameRef = useRef<number | null>(null);
   const stateRef = useRef(state);
 
@@ -35,6 +72,7 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
       );
       lastFrameRef.current = time;
       accumulatedTimeRef.current += deltaSeconds;
+      automationAccumulatedMsRef.current += deltaSeconds * 1000;
 
       const now = Date.now();
 
@@ -55,13 +93,53 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
         }
       }
 
-      const automationTickSeconds = resolveGameEffects(stateRef.current.rowModules, stateRef.current).automationIntervalMs / 1000;
-      if (accumulatedTimeRef.current >= Math.max(uiUpdateIntervalSeconds, automationTickSeconds)) {
+      if (accumulatedTimeRef.current >= uiUpdateIntervalSeconds) {
         const deltaMs = accumulatedTimeRef.current * 1000;
         accumulatedTimeRef.current = 0;
 
         // Production tick
         dispatch({ type: 'TICK', deltaMs });
+      }
+
+      // Automation scheduling phase (bounded to one schedule evaluation per frame)
+      const currentState = stateRef.current;
+      if (currentState.automation.enabled && !isAutomationBlockedByDisaster(currentState)) {
+        // Resolve row + upgrade effects exactly once per scheduling cycle
+        const rowEffects = resolveGameEffects(currentState.rowModules, currentState);
+        const automationIntervalMs = rowEffects.automationIntervalMs;
+
+        if (automationAccumulatedMsRef.current >= automationIntervalMs) {
+          const upgradeEffects =
+            currentState.upgradeEffectProjection ??
+            resolveUpgradeEffects(currentState.ownedUpgrades, currentState.machines);
+
+          const plannedOps = planAutomationOps(
+            currentState,
+            {
+              ...currentState.automation,
+              runtime: {
+                ...currentState.automation.runtime,
+                opsPerTickBudget: 1,
+              },
+            },
+            upgradeEffects,
+            now
+          );
+
+          const ops = mapPlannedOpsToActions(plannedOps, 1);
+          if (ops.length > 0) {
+            dispatch({ type: 'RUN_AUTOMATION_OPS', ops });
+          }
+
+          // Never loop to exhaustion in one frame.
+          automationAccumulatedMsRef.current = Math.max(
+            0,
+            automationAccumulatedMsRef.current - automationIntervalMs
+          );
+        }
+      } else {
+        // Keep accumulator bounded while blocked/disabled.
+        automationAccumulatedMsRef.current = Math.min(automationAccumulatedMsRef.current, 1000);
       }
 
       animationFrameRef.current = requestAnimationFrame(step);
@@ -92,9 +170,9 @@ const generateDisaster = (state: GameState, rowModules: RowModule[]): Disaster |
     // Fire targets one random non-disabled machine
     const validTargets = state.machines.filter(m => !m.disabled);
     if (validTargets.length === 0) return null;
-    
+
     const target = validTargets[Math.floor(Math.random() * validTargets.length)];
-    
+
     return {
       type: 'fire',
       targetSlot: target.slotIndex,
@@ -110,7 +188,7 @@ const generateDisaster = (state: GameState, rowModules: RowModule[]): Disaster |
     );
     const reduction = getGlobalDisasterReduction(rowModules);
     const finalDuration = Math.max(baseDuration * (1 - reduction), 2000); // Min 2s
-    
+
     return {
       type: 'powerOutage',
       startTime: Date.now(),
