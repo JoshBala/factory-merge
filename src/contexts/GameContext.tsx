@@ -1,6 +1,6 @@
 // === GAME STATE CONTEXT & REDUCER ===
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import { GameState, GameAction, Machine, GAME_CONFIG, AutomationOp } from '@/types/game';
+import { GameState, GameAction, Machine, GAME_CONFIG, AutomationBlockedReason, AutomationOp } from '@/types/game';
 import { BALANCE, getScrapRefund } from '@/config/balance';
 import { 
   generateId, calculateEarnings, canMerge, getMergedLevel, 
@@ -146,13 +146,48 @@ const resolveCatalogUpgradeCost = (upgradeId: string, currentLevel: number): num
   return Math.round(definition.baseCost + levelFactor * definition.baseCost * 0.22 * definition.costGrowth.scale);
 };
 
-const executeAutomationOpSafely = (state: GameState, op: AutomationOp): GameState => {
+const withBlockedMetric = (state: GameState, reason: AutomationBlockedReason): GameState => {
+  const debugMetrics = state.automation.runtime.debugMetrics ?? {
+    attemptedOps: 0,
+    successfulOps: 0,
+    blockedReasons: {
+      no_match: 0,
+      cooldown: 0,
+      disabled: 0,
+      full_grid: 0,
+    },
+  };
+
+  return {
+    ...state,
+    automation: {
+      ...state.automation,
+      runtime: {
+        ...state.automation.runtime,
+        debugMetrics: {
+          ...debugMetrics,
+          blockedReasons: {
+            ...debugMetrics.blockedReasons,
+            [reason]: debugMetrics.blockedReasons[reason] + 1,
+          },
+        },
+      },
+    },
+  };
+};
+
+const executeAutomationOpSafely = (
+  state: GameState,
+  op: AutomationOp
+): { nextState: GameState; success: boolean; blockedReason?: AutomationBlockedReason } => {
   const operationAction: GameAction | null = (() => {
     switch (op.type) {
       case 'merge_machines': {
         const source = state.machines.find(machine => machine.id === op.sourceId);
         const target = state.machines.find(machine => machine.id === op.targetId);
-        if (!source || !target || !canMerge(source, target)) return null;
+        if (!source || !target) return null;
+        if (source.disabled || target.disabled) return null;
+        if (!canMerge(source, target)) return null;
         return { type: 'MERGE_MACHINES', sourceId: op.sourceId, targetId: op.targetId };
       }
       case 'move_machine': {
@@ -167,16 +202,33 @@ const executeAutomationOpSafely = (state: GameState, op: AutomationOp): GameStat
     }
   })();
 
-  if (!operationAction) return state;
+  if (!operationAction) {
+    if (op.type === 'move_machine') {
+      const machine = state.machines.find(candidate => candidate.id === op.machineId);
+      if (machine?.disabled) return { nextState: state, success: false, blockedReason: 'disabled' };
+      const hasEmptySlots = state.machines.length < GAME_CONFIG.gridSize;
+      return { nextState: state, success: false, blockedReason: hasEmptySlots ? 'no_match' : 'full_grid' };
+    }
+
+    const source = state.machines.find(machine => machine.id === op.sourceId);
+    const target = state.machines.find(machine => machine.id === op.targetId);
+    if (source?.disabled || target?.disabled) {
+      return { nextState: state, success: false, blockedReason: 'disabled' };
+    }
+    return { nextState: state, success: false, blockedReason: 'no_match' };
+  }
 
   const nextState = gameReducer(state, operationAction);
-  if (nextState === state) return state;
+  if (nextState === state) return { nextState: state, success: false, blockedReason: 'no_match' };
 
-  if (nextState.machines === state.machines) return nextState;
+  if (nextState.machines === state.machines) return { nextState: nextState, success: false, blockedReason: 'no_match' };
 
   return {
-    ...nextState,
-    upgradeEffectProjection: resolveUpgradeEffects(nextState.ownedUpgrades, nextState.machines),
+    nextState: {
+      ...nextState,
+      upgradeEffectProjection: resolveUpgradeEffects(nextState.ownedUpgrades, nextState.machines),
+    },
+    success: true,
   };
 };
 
@@ -558,7 +610,51 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     case 'RUN_AUTOMATION_OPS': {
       if (action.ops.length === 0) return state;
 
-      return executeAutomationOpSafely(state, action.ops[0]);
+      const debugMetrics = state.automation.runtime.debugMetrics ?? {
+        attemptedOps: 0,
+        successfulOps: 0,
+        blockedReasons: {
+          no_match: 0,
+          cooldown: 0,
+          disabled: 0,
+          full_grid: 0,
+        },
+      };
+      const op = action.ops[0];
+      const result = executeAutomationOpSafely(state, op);
+      const baseState = result.nextState;
+
+      const withAttempt = {
+        ...baseState,
+        automation: {
+          ...baseState.automation,
+          runtime: {
+            ...baseState.automation.runtime,
+            lastRunAt: Date.now(),
+            debugMetrics: {
+              ...debugMetrics,
+              attemptedOps: debugMetrics.attemptedOps + 1,
+              successfulOps: debugMetrics.successfulOps + (result.success ? 1 : 0),
+              blockedReasons: { ...debugMetrics.blockedReasons },
+            },
+          },
+          rules: result.success && op.ruleId
+            ? baseState.automation.rules.map(rule =>
+                rule.id === op.ruleId ? { ...rule, lastTriggeredAt: Date.now() } : rule
+              )
+            : baseState.automation.rules,
+        },
+      };
+
+      if (result.blockedReason) {
+        return withBlockedMetric(withAttempt, result.blockedReason);
+      }
+
+      return withAttempt;
+    }
+
+    case 'RECORD_AUTOMATION_BLOCKED': {
+      return withBlockedMetric(state, action.reason);
     }
 
     default:
