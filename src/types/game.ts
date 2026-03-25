@@ -73,6 +73,7 @@ export interface AutomationRuntime {
   lastRunAt: number | null;
   pendingQueue: string[];
   opsPerTickBudget: number;
+  debugMetrics?: AutomationDebugMetrics;
 }
 
 export interface AutomationState {
@@ -81,9 +82,17 @@ export interface AutomationState {
   enabled: boolean;
 }
 
+export type AutomationBlockedReason = 'no_match' | 'cooldown' | 'disabled' | 'full_grid';
+
+export interface AutomationDebugMetrics {
+  attemptedOps: number;
+  successfulOps: number;
+  blockedReasons: Record<AutomationBlockedReason, number>;
+}
+
 export type AutomationOp =
-  | { type: 'merge_machines'; sourceId: string; targetId: string }
-  | { type: 'move_machine'; machineId: string; targetSlot: number };
+  | { type: 'merge_machines'; sourceId: string; targetId: string; ruleId?: string }
+  | { type: 'move_machine'; machineId: string; targetSlot: number; ruleId?: string };
 
 export interface GameState {
   currency: number;
@@ -218,4 +227,5 @@ export type GameAction =
   | { type: 'UPDATE_AUTOMATION_RULE'; ruleId: string; updates: Partial<AutomationRule> }
   | { type: 'REMOVE_AUTOMATION_RULE'; ruleId: string }
   | { type: 'TOGGLE_AUTOMATION'; enabled?: boolean }
-  | { type: 'RUN_AUTOMATION_OPS'; ops: AutomationOp[] };
+  | { type: 'RUN_AUTOMATION_OPS'; ops: AutomationOp[] }
+  | { type: 'RECORD_AUTOMATION_BLOCKED'; reason: AutomationBlockedReason };
