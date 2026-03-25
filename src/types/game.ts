@@ -81,6 +81,10 @@ export interface AutomationState {
   enabled: boolean;
 }
 
+export type AutomationOp =
+  | { type: 'merge_machines'; sourceId: string; targetId: string }
+  | { type: 'move_machine'; machineId: string; targetSlot: number };
+
 export interface GameState {
   currency: number;
   machines: Machine[];
@@ -213,4 +217,5 @@ export type GameAction =
   | { type: 'ADD_AUTOMATION_RULE'; rule: AutomationRule }
   | { type: 'UPDATE_AUTOMATION_RULE'; ruleId: string; updates: Partial<AutomationRule> }
   | { type: 'REMOVE_AUTOMATION_RULE'; ruleId: string }
-  | { type: 'TOGGLE_AUTOMATION'; enabled?: boolean };
+  | { type: 'TOGGLE_AUTOMATION'; enabled?: boolean }
+  | { type: 'RUN_AUTOMATION_OPS'; ops: AutomationOp[] };
