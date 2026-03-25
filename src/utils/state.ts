@@ -23,6 +23,11 @@ export const createInitialState = (): GameState => ({
       lastRunAt: null,
       pendingQueue: [],
       opsPerTickBudget: 1,
+      triggerFlags: {
+        afterBuyMachine: false,
+        afterMergeMachines: false,
+        afterScrapOrMoveMachine: false,
+      },
       debugMetrics: {
         attemptedOps: 0,
         successfulOps: 0,
