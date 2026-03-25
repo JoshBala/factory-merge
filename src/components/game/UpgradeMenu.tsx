@@ -88,6 +88,7 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
   const { state, actions } = useGame();
   const [categoryFilter, setCategoryFilter] = useState<UpgradeCategory | 'all'>('all');
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
+  const [hideMaxUpgrades, setHideMaxUpgrades] = useState(false);
 
   const ownedUpgrades = useMemo(
     () => ((state as Record<string, unknown>).ownedUpgrades ?? {}) as Record<string, number>,
@@ -124,9 +125,11 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
       })
       .filter(item => item.revealed)
       .filter(item => categoryFilter === 'all' || item.upgrade.category === categoryFilter)
-      .filter(item => tierFilter === 'all' || item.upgrade.tier === tierFilter);
+      .filter(item => tierFilter === 'all' || item.upgrade.tier === tierFilter)
+      .filter(item => !hideMaxUpgrades || item.currentLevel < item.upgrade.maxLevel);
   }, [
     categoryFilter,
+    hideMaxUpgrades,
     ownedUpgrades,
     state.machines.length,
     state.stats.highestMachineLevel,
@@ -199,6 +202,18 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
                   </Button>
                 ))}
               </div>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase text-muted-foreground mb-2">Display</p>
+              <Button
+                variant={hideMaxUpgrades ? 'default' : 'ghost'}
+                className="w-full justify-start"
+                size="sm"
+                onClick={() => setHideMaxUpgrades(prev => !prev)}
+              >
+                Hide Max Upgrades
+              </Button>
             </div>
           </aside>
 
