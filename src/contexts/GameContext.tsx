@@ -11,6 +11,7 @@ import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
 import { createInitialState } from '@/utils/state';
 import { UPGRADE_BY_ID, getCompletedTier, getUpgradeLockReasons } from '@/config/upgrades';
+import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
 
 type DynamicState = GameState & Record<string, unknown>;
 
@@ -22,10 +23,10 @@ type UpgradeDefinition = {
   costs?: number[] | Record<string, number>;
 };
 
-const readOwnedUpgrades = (state: DynamicState): Record<string, number> => {
+const readOwnedUpgrades = (state: DynamicState): NonNullable<GameState['ownedUpgrades']> => {
   const owned = state.ownedUpgrades;
   if (!owned || typeof owned !== 'object' || Array.isArray(owned)) return {};
-  return owned as Record<string, number>;
+  return owned as NonNullable<GameState['ownedUpgrades']>;
 };
 
 const readUpgradeDefinition = (state: DynamicState, upgradeId: string): UpgradeDefinition | null => {
@@ -146,7 +147,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         state.machines, 
         isPowerOutage, 
         action.deltaMs,
-        state.rowModules
+        state.rowModules,
+        state
       );
       
       // Check if disaster should end
@@ -278,9 +280,11 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
     case 'LOAD_GAME': {
       const loadedState = migrateGameState(action.state) as DynamicState;
+      const ownedUpgrades = readOwnedUpgrades(loadedState);
       return {
         ...loadedState,
-        ownedUpgrades: readOwnedUpgrades(loadedState),
+        ownedUpgrades,
+        upgradeEffectProjection: resolveUpgradeEffects(ownedUpgrades, loadedState.machines),
         lastTickTime: Date.now(),
       } as GameState;
     }
@@ -426,6 +430,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             ...ownedUpgrades,
             [action.upgradeId]: currentLevel + 1,
           },
+          upgradeEffectProjection: resolveUpgradeEffects(
+            {
+              ...ownedUpgrades,
+              [action.upgradeId]: currentLevel + 1,
+            },
+            state.machines
+          ),
         } as GameState;
       }
 
@@ -447,6 +458,13 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           ...ownedUpgrades,
           [action.upgradeId]: nextLevel,
         },
+        upgradeEffectProjection: resolveUpgradeEffects(
+          {
+            ...ownedUpgrades,
+            [action.upgradeId]: nextLevel,
+          },
+          state.machines
+        ),
       } as GameState;
     }
 
@@ -482,15 +500,19 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const saved = loadGame();
     if (saved) {
       const migrated = migrateGameState(saved) as DynamicState;
+      const ownedUpgrades = readOwnedUpgrades(migrated);
       return {
         ...migrated,
-        ownedUpgrades: readOwnedUpgrades(migrated),
+        ownedUpgrades,
+        upgradeEffectProjection: resolveUpgradeEffects(ownedUpgrades, migrated.machines),
       } as GameState;
     }
     const initialState = createInitialState() as DynamicState;
+    const ownedUpgrades = readOwnedUpgrades(initialState);
     return {
       ...initialState,
-      ownedUpgrades: readOwnedUpgrades(initialState),
+      ownedUpgrades,
+      upgradeEffectProjection: resolveUpgradeEffects(ownedUpgrades, initialState.machines),
     } as GameState;
   });
 

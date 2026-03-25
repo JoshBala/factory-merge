@@ -2,6 +2,8 @@
 // Note: Game balance constants are in src/config/balance.ts
 
 import { BALANCE } from '@/config/balance';
+import type { UpgradeId } from '@/config/upgrades';
+import type { UpgradeEffectProjection } from '@/utils/upgradeEffects';
 
 // Machine level is now a number (no cap)
 export type DisasterType = 'fire' | 'powerOutage';
@@ -63,6 +65,8 @@ export interface GameState {
   rowModules: RowModule[]; // 0-3 modules, one per row
   stats: GameStats;
   saveVersion?: number;
+  ownedUpgrades?: Partial<Record<UpgradeId, number>>;
+  upgradeEffectProjection?: UpgradeEffectProjection;
 }
 
 // === GAME BALANCE CONSTANTS (legacy wrapper, prefer importing from balance.ts) ===

@@ -59,10 +59,10 @@ export const GameHUD = () => {
 
   // Calculate rates using unified function
   const isPowerOutage = state.activeDisaster?.type === 'powerOutage';
-  const modifiedRate = calculateProductionRate(state.machines, isPowerOutage, state.rowModules);
+  const modifiedRate = calculateProductionRate(state.machines, isPowerOutage, state.rowModules, state);
   const baseRate = calculateBaseProductionRate(state.machines);
   const rowContributions = getRowContributions(state.machines, state.rowModules);
-  const effects = resolveGameEffects(state.rowModules, state as RowModule[] & Record<string, unknown>);
+  const effects = resolveGameEffects(state.rowModules, state);
 
   const emptySlots = Array.from({ length: BALANCE.gridSize }, (_, index) => index)
     .filter(slotIndex => !state.machines.some(machine => machine.slotIndex === slotIndex));
@@ -100,10 +100,11 @@ export const GameHUD = () => {
   };
   const beforeRate = modifiedRate;
   const afterRate = selectedPurchase?.kind === 'machine'
-    ? calculateProductionRate(
+      ? calculateProductionRate(
         [...state.machines, { id: 'debug-machine', level: 1, slotIndex: selectedPurchase.slotIndex, disabled: false }],
         isPowerOutage,
-        state.rowModules
+        state.rowModules,
+        state
       )
     : null;
 
