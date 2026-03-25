@@ -1,5 +1,23 @@
 import { BONUS_RANGES, BonusKind, GameState, RowBonus, RowModule } from '@/types/game';
 
+const migrateOwnedUpgrades = (ownedUpgrades: unknown): Record<string, number> => {
+  if (!ownedUpgrades || typeof ownedUpgrades !== 'object' || Array.isArray(ownedUpgrades)) {
+    return {};
+  }
+
+  return Object.entries(ownedUpgrades as Record<string, unknown>).reduce<Record<string, number>>(
+    (acc, [upgradeId, rawLevel]) => {
+      if (typeof rawLevel === 'number' && Number.isFinite(rawLevel) && rawLevel >= 0) {
+        acc[upgradeId] = Math.floor(rawLevel);
+      } else {
+        acc[upgradeId] = 0;
+      }
+      return acc;
+    },
+    {}
+  );
+};
+
 const migrateRowBonus = (bonus: RowBonus, rarity: RowModule['rarity']): RowBonus => {
   const bonusShape = bonus as RowBonus & { type?: BonusKind; roll?: number };
 
@@ -36,7 +54,7 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
     bonuses: module.bonuses.map(bonus => migrateRowBonus(bonus, module.rarity)),
   }));
 
-export const migrateGameState = (state: GameState): GameState => ({
+export const migrateGameState = (state: Partial<GameState>): GameState => ({
   ...state,
   saveVersion: state.saveVersion ?? 0,
   stats: {
@@ -46,4 +64,5 @@ export const migrateGameState = (state: GameState): GameState => ({
     highestMachineLevel: state.stats?.highestMachineLevel ?? 0,
   },
   rowModules: migrateRowModules(state.rowModules || []),
+  ownedUpgrades: migrateOwnedUpgrades(state.ownedUpgrades),
 });

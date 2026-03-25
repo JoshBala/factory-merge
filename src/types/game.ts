@@ -65,7 +65,7 @@ export interface GameState {
   rowModules: RowModule[]; // 0-3 modules, one per row
   stats: GameStats;
   saveVersion?: number;
-  ownedUpgrades?: Partial<Record<UpgradeId, number>>;
+  ownedUpgrades: Record<string, number>;
   upgradeEffectProjection?: UpgradeEffectProjection;
 }
 

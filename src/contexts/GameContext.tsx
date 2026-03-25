@@ -13,8 +13,6 @@ import { createInitialState } from '@/utils/state';
 import { UPGRADE_BY_ID, getCompletedTier, getUpgradeLockReasons } from '@/config/upgrades';
 import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
 
-type DynamicState = GameState & Record<string, unknown>;
-
 type UpgradeDefinition = {
   unlockRequirements?: Record<string, number> | Array<{ upgradeId: string; level: number }>;
   maxLevel?: number;
@@ -23,17 +21,31 @@ type UpgradeDefinition = {
   costs?: number[] | Record<string, number>;
 };
 
-const readOwnedUpgrades = (state: DynamicState): NonNullable<GameState['ownedUpgrades']> => {
-  const owned = state.ownedUpgrades;
-  if (!owned || typeof owned !== 'object' || Array.isArray(owned)) return {};
-  return owned as NonNullable<GameState['ownedUpgrades']>;
+const readResourceMap = (resources: unknown): Record<string, number> => {
+  if (!resources || typeof resources !== 'object' || Array.isArray(resources)) {
+    return {};
+  }
+
+  return Object.entries(resources as Record<string, unknown>).reduce<Record<string, number>>(
+    (acc, [resource, amount]) => {
+      if (typeof amount === 'number' && Number.isFinite(amount)) {
+        acc[resource] = amount;
+      }
+      return acc;
+    },
+    {}
+  );
 };
 
-const readUpgradeDefinition = (state: DynamicState, upgradeId: string): UpgradeDefinition | null => {
+const getDynamicField = (state: GameState, key: string): unknown => {
+  return (state as Record<string, unknown>)[key];
+};
+
+const readUpgradeDefinition = (state: GameState, upgradeId: string): UpgradeDefinition | null => {
   const sources = [
-    state.upgradeDefinitions,
-    state.upgrades,
-    state.upgradeConfig,
+    getDynamicField(state, 'upgradeDefinitions'),
+    getDynamicField(state, 'upgrades'),
+    getDynamicField(state, 'upgradeConfig'),
   ];
 
   for (const source of sources) {
@@ -86,13 +98,11 @@ const resolveUpgradeCost = (definition: UpgradeDefinition, nextLevel: number): R
   return { currency: 0 };
 };
 
-const canAffordUpgrade = (state: DynamicState, costs: Record<string, number>): boolean => {
-  const resources = (state.resources && typeof state.resources === 'object')
-    ? (state.resources as Record<string, number>)
-    : {};
+const canAffordUpgrade = (state: GameState, costs: Record<string, number>): boolean => {
+  const resources = readResourceMap(getDynamicField(state, 'resources'));
 
   return Object.entries(costs).every(([resource, amount]) => {
-    const topLevelValue = state[resource];
+    const topLevelValue = getDynamicField(state, resource);
     if (typeof topLevelValue === 'number') return topLevelValue >= amount;
     const nestedValue = resources[resource];
     if (typeof nestedValue === 'number') return nestedValue >= amount;
@@ -100,11 +110,9 @@ const canAffordUpgrade = (state: DynamicState, costs: Record<string, number>): b
   });
 };
 
-const applyUpgradeCost = (state: DynamicState, costs: Record<string, number>): DynamicState => {
-  const nextState: DynamicState = { ...state };
-  const currentResources = (state.resources && typeof state.resources === 'object')
-    ? (state.resources as Record<string, number>)
-    : {};
+const applyUpgradeCost = (state: GameState, costs: Record<string, number>): GameState => {
+  const nextState = { ...state } as Record<string, unknown>;
+  const currentResources = readResourceMap(getDynamicField(state, 'resources'));
   const updatedResources = { ...currentResources };
   let touchedNestedResources = false;
 
@@ -122,7 +130,7 @@ const applyUpgradeCost = (state: DynamicState, costs: Record<string, number>): D
     nextState.resources = updatedResources;
   }
 
-  return nextState;
+  return nextState as GameState;
 };
 
 
@@ -279,14 +287,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
 
     case 'LOAD_GAME': {
-      const loadedState = migrateGameState(action.state) as DynamicState;
-      const ownedUpgrades = readOwnedUpgrades(loadedState);
+      const loadedState = migrateGameState(action.state);
       return {
         ...loadedState,
-        ownedUpgrades,
-        upgradeEffectProjection: resolveUpgradeEffects(ownedUpgrades, loadedState.machines),
+        upgradeEffectProjection: resolveUpgradeEffects(loadedState.ownedUpgrades, loadedState.machines),
         lastTickTime: Date.now(),
-      } as GameState;
+      };
     }
 
     case 'RESET_GAME': {
@@ -403,8 +409,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
 
     case 'BUY_UPGRADE': {
-      const dynamicState = state as DynamicState;
-      const ownedUpgrades = readOwnedUpgrades(dynamicState);
+      const ownedUpgrades = state.ownedUpgrades;
       const currentLevel = ownedUpgrades[action.upgradeId] ?? 0;
 
       const catalogUpgrade = UPGRADE_BY_ID[action.upgradeId];
@@ -437,10 +442,10 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
             },
             state.machines
           ),
-        } as GameState;
+        };
       }
 
-      const definition = readUpgradeDefinition(dynamicState, action.upgradeId);
+      const definition = readUpgradeDefinition(state, action.upgradeId);
       if (!definition) return state;
 
       const maxLevel = definition.maxLevel ?? Number.POSITIVE_INFINITY;
@@ -449,9 +454,9 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       const nextLevel = currentLevel + 1;
       const costs = resolveUpgradeCost(definition, nextLevel);
-      if (!canAffordUpgrade(dynamicState, costs)) return state;
+      if (!canAffordUpgrade(state, costs)) return state;
 
-      const nextState = applyUpgradeCost(dynamicState, costs);
+      const nextState = applyUpgradeCost(state, costs);
       return {
         ...nextState,
         ownedUpgrades: {
@@ -465,7 +470,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           },
           state.machines
         ),
-      } as GameState;
+      };
     }
 
     default:
@@ -499,21 +504,17 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Try to load saved game
     const saved = loadGame();
     if (saved) {
-      const migrated = migrateGameState(saved) as DynamicState;
-      const ownedUpgrades = readOwnedUpgrades(migrated);
+      const migrated = migrateGameState(saved);
       return {
         ...migrated,
-        ownedUpgrades,
-        upgradeEffectProjection: resolveUpgradeEffects(ownedUpgrades, migrated.machines),
-      } as GameState;
+        upgradeEffectProjection: resolveUpgradeEffects(migrated.ownedUpgrades, migrated.machines),
+      };
     }
-    const initialState = createInitialState() as DynamicState;
-    const ownedUpgrades = readOwnedUpgrades(initialState);
+    const initialState = createInitialState();
     return {
       ...initialState,
-      ownedUpgrades,
-      upgradeEffectProjection: resolveUpgradeEffects(ownedUpgrades, initialState.machines),
-    } as GameState;
+      upgradeEffectProjection: resolveUpgradeEffects(initialState.ownedUpgrades, initialState.machines),
+    };
   });
 
   // Note: Offline earnings are handled by GameScreen with a modal
