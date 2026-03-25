@@ -13,6 +13,7 @@ import {
   getScrapRefund as getScrapRefundFromBalance,
   getRepairCostFromLevel 
 } from '@/config/balance';
+import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
 
 // Generate unique ID for machines
 export const generateId = (): string => 
@@ -25,30 +26,7 @@ export const generateId = (): string =>
  * 2) Distinct multiplicative layers multiply together at the end.
  * 3) Discounts/reductions are clamped to [0%, 95%] to avoid invalid negative values.
  */
-type UpgradeAwareState = GameState & Record<string, unknown>;
-
-const readNumeric = (value: unknown): number =>
-  typeof value === 'number' && Number.isFinite(value) ? value : 0;
-
-const readUpgradePercent = (
-  state: UpgradeAwareState,
-  candidates: string[]
-): number => {
-  const containers = [
-    state,
-    (state as Record<string, unknown>).upgrades,
-    (state as Record<string, unknown>).upgradeEffects,
-    (state as Record<string, unknown>).upgradeStats,
-  ];
-
-  return containers.reduce((total, container) => {
-    if (!container || typeof container !== 'object') return total;
-    return total + candidates.reduce(
-      (candidateTotal, key) => candidateTotal + readNumeric((container as Record<string, unknown>)[key]),
-      0
-    );
-  }, 0);
-};
+type UpgradeAwareState = GameState;
 
 type RowIndex = 0 | 1 | 2;
 
@@ -116,32 +94,25 @@ const resolveRowBonusPercents = (
   return totals;
 };
 
-const resolveGlobalUpgradePercents = (state?: UpgradeAwareState): Record<BonusKind, number> => ({
-  productionPercent: state
-    ? readUpgradePercent(state, ['productionPercent', 'productionMultiplierPercent', 'globalProductionPercent'])
-    : 0,
-  productionAfterMerge: state
-    ? readUpgradePercent(state, ['productionAfterMergePercent', 'postMergeProductionPercent'])
-    : 0,
-  disasterDurationReduction: state
-    ? readUpgradePercent(state, ['disasterDurationReduction', 'disasterDurationReductionPercent'])
-    : 0,
-  disasterChanceIncrease: state
-    ? readUpgradePercent(state, ['disasterChanceIncrease', 'disasterChanceIncreasePercent'])
-    : 0,
-  disasterResolutionReward: state
-    ? readUpgradePercent(state, ['disasterResolutionReward', 'disasterResolutionRewardPercent'])
-    : 0,
-  upgradeCostReduction: state
-    ? readUpgradePercent(state, ['upgradeCostReduction', 'upgradeCostReductionPercent', 'machineCostReductionPercent', 'machineCostDiscountPercent'])
-    : 0,
-  automationSpeed: state
-    ? readUpgradePercent(state, ['automationSpeedPercent', 'automationSpeed', 'tickSpeedPercent'])
-    : 0,
-  offlineEarningsPercent: state
-    ? readUpgradePercent(state, ['offlineEarningsPercent', 'offlineEfficiencyPercent'])
-    : 0,
-});
+const resolveGlobalUpgradePercents = (state?: UpgradeAwareState): Record<BonusKind, number> => {
+  if (!state) {
+    return { ...EMPTY_ROW_BONUSES[0] };
+  }
+
+  const projection = resolveUpgradeEffects(state.ownedUpgrades ?? {}, state.machines);
+
+  return {
+    productionPercent:
+      projection.throughputPercent + projection.synergyProductionPercent + projection.tierTargetedProductionPercent,
+    productionAfterMerge: projection.mergeQualityPercent,
+    disasterDurationReduction: 0,
+    disasterChanceIncrease: 0,
+    disasterResolutionReward: 0,
+    upgradeCostReduction: projection.machineCostReductionPercent,
+    automationSpeed: projection.automationSpeedPercent,
+    offlineEarningsPercent: 0,
+  };
+};
 
 export const resolveGameEffects = (
   rowModules: RowModule[] = [],
@@ -202,18 +173,7 @@ export const getEffectiveAutomationInterval = (
 export const getEffectiveProductionMultiplier = (
   state: UpgradeAwareState
 ): number => {
-  const productionPercent = readUpgradePercent(state, [
-    'productionPercent',
-    'productionMultiplierPercent',
-    'globalProductionPercent',
-  ]);
-
-  const explicitMultiplier = Math.max(
-    0,
-    readUpgradePercent(state, ['productionMultiplier', 'globalProductionMultiplier']) || 1
-  );
-
-  return Math.max(0, 1 + productionPercent / 100) * explicitMultiplier;
+  return resolveGameEffects(state.rowModules ?? [], state).productionMultiplier;
 };
 
 /**
@@ -234,16 +194,9 @@ export const getEffectiveBaseMachineOutput = (
 export const getEffectiveBaseCellCreationRate = (
   state: UpgradeAwareState
 ): number => {
-  const baseCellRate =
-    readUpgradePercent(state, ['baseCellCreationRate', 'cellCreationBaseRate']) ||
-    getEffectiveBaseMachineOutput(state);
-
-  const cellRatePercent = readUpgradePercent(state, [
-    'cellCreationRatePercent',
-    'cellCreationPercent',
-  ]);
-
-  return baseCellRate * Math.max(0, 1 + cellRatePercent / 100);
+  const projection = resolveUpgradeEffects(state.ownedUpgrades ?? {}, state.machines);
+  const baseCellRate = BASE_PRODUCTION_PER_SECOND + projection.baseGenerationFlat;
+  return baseCellRate * Math.max(0, 1 + projection.baseGenerationPercent / 100);
 };
 
 /**
@@ -403,10 +356,11 @@ export const getDisasterDurationReduction = (
 export const calculateProductionRate = (
   machines: Machine[],
   isPowerOutage: boolean,
-  rowModules: RowModule[] = []
+  rowModules: RowModule[] = [],
+  state?: UpgradeAwareState
 ): number => {
   if (isPowerOutage) return 0;
-  const effects = resolveGameEffects(rowModules);
+  const effects = resolveGameEffects(rowModules, state);
   return machines.reduce((total, machine) => {
     if (machine.disabled) return total;
     // Use procedural production rate from balance config
@@ -433,9 +387,10 @@ export const calculateEarnings = (
   machines: Machine[],
   isPowerOutage: boolean,
   deltaMs: number,
-  rowModules: RowModule[] = []
+  rowModules: RowModule[] = [],
+  state?: UpgradeAwareState
 ): number => {
-  const rate = calculateProductionRate(machines, isPowerOutage, rowModules);
+  const rate = calculateProductionRate(machines, isPowerOutage, rowModules, state);
   return (rate * deltaMs) / 1000; // Convert ms to seconds
 };
 

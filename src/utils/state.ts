@@ -15,5 +15,6 @@ export const createInitialState = (): GameState => ({
     lifetimeMerges: 0,
     highestMachineLevel: 0,
   },
+  ownedUpgrades: {},
   saveVersion: SAVE_VERSION,
 });
