@@ -16,5 +16,14 @@ export const createInitialState = (): GameState => ({
     highestMachineLevel: 0,
   },
   ownedUpgrades: {},
+  automation: {
+    enabled: false,
+    rules: [],
+    runtime: {
+      lastRunAt: null,
+      pendingQueue: [],
+      opsPerTickBudget: 1,
+    },
+  },
   saveVersion: SAVE_VERSION,
 });

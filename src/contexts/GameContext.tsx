@@ -473,6 +473,54 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       };
     }
 
+    case 'ADD_AUTOMATION_RULE': {
+      if (state.automation.rules.some(rule => rule.id === action.rule.id)) return state;
+
+      return {
+        ...state,
+        automation: {
+          ...state.automation,
+          rules: [...state.automation.rules, action.rule],
+        },
+      };
+    }
+
+    case 'UPDATE_AUTOMATION_RULE': {
+      const hasRule = state.automation.rules.some(rule => rule.id === action.ruleId);
+      if (!hasRule) return state;
+
+      return {
+        ...state,
+        automation: {
+          ...state.automation,
+          rules: state.automation.rules.map(rule =>
+            rule.id === action.ruleId ? { ...rule, ...action.updates, id: rule.id } : rule
+          ),
+        },
+      };
+    }
+
+    case 'REMOVE_AUTOMATION_RULE': {
+      return {
+        ...state,
+        automation: {
+          ...state.automation,
+          rules: state.automation.rules.filter(rule => rule.id !== action.ruleId),
+        },
+      };
+    }
+
+    case 'TOGGLE_AUTOMATION': {
+      const enabled = action.enabled ?? !state.automation.enabled;
+      return {
+        ...state,
+        automation: {
+          ...state.automation,
+          enabled,
+        },
+      };
+    }
+
     default:
       return state;
   }

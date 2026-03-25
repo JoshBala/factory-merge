@@ -54,6 +54,25 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
     bonuses: module.bonuses.map(bonus => migrateRowBonus(bonus, module.rarity)),
   }));
 
+const migrateAutomationState = (automation: Partial<GameState>['automation']): GameState['automation'] => {
+  const runtime = automation?.runtime;
+
+  return {
+    enabled: automation?.enabled ?? false,
+    rules: Array.isArray(automation?.rules) ? automation.rules : [],
+    runtime: {
+      lastRunAt: typeof runtime?.lastRunAt === 'number' ? runtime.lastRunAt : null,
+      pendingQueue: Array.isArray(runtime?.pendingQueue)
+        ? runtime.pendingQueue.filter((entry): entry is string => typeof entry === 'string')
+        : [],
+      opsPerTickBudget:
+        typeof runtime?.opsPerTickBudget === 'number' && Number.isFinite(runtime.opsPerTickBudget) && runtime.opsPerTickBudget > 0
+          ? Math.floor(runtime.opsPerTickBudget)
+          : 1,
+    },
+  };
+};
+
 export const migrateGameState = (state: Partial<GameState>): GameState => ({
   ...state,
   saveVersion: state.saveVersion ?? 0,
@@ -65,4 +84,5 @@ export const migrateGameState = (state: Partial<GameState>): GameState => ({
   },
   rowModules: migrateRowModules(state.rowModules || []),
   ownedUpgrades: migrateOwnedUpgrades(state.ownedUpgrades),
+  automation: migrateAutomationState(state.automation),
 });

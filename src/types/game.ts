@@ -55,6 +55,32 @@ export interface GameStats {
   highestMachineLevel: number;
 }
 
+export type AutomationTriggerType = 'interval' | 'slot_filled' | 'merge_available';
+
+export interface AutomationRule {
+  id: string;
+  enabled: boolean;
+  triggerType: AutomationTriggerType;
+  sourceRowFilter: Array<0 | 1 | 2>;
+  targetRowFilter: Array<0 | 1 | 2>;
+  sourceSlotFilter: number[];
+  targetSlotFilter: number[];
+  cooldownMs: number;
+  lastTriggeredAt: number | null;
+}
+
+export interface AutomationRuntime {
+  lastRunAt: number | null;
+  pendingQueue: string[];
+  opsPerTickBudget: number;
+}
+
+export interface AutomationState {
+  rules: AutomationRule[];
+  runtime: AutomationRuntime;
+  enabled: boolean;
+}
+
 export interface GameState {
   currency: number;
   machines: Machine[];
@@ -67,6 +93,7 @@ export interface GameState {
   saveVersion?: number;
   ownedUpgrades: Record<string, number>;
   upgradeEffectProjection?: UpgradeEffectProjection;
+  automation: AutomationState;
 }
 
 // === GAME BALANCE CONSTANTS (legacy wrapper, prefer importing from balance.ts) ===
@@ -182,4 +209,8 @@ export type GameAction =
   | { type: 'SCRAP_MACHINE'; machineId: string }
   | { type: 'BUY_UPGRADE'; upgradeId: UpgradeId }
   | { type: 'REFUND_UPGRADE'; upgradeId: UpgradeId }
-  | { type: 'RESET_UPGRADES' };
+  | { type: 'RESET_UPGRADES' }
+  | { type: 'ADD_AUTOMATION_RULE'; rule: AutomationRule }
+  | { type: 'UPDATE_AUTOMATION_RULE'; ruleId: string; updates: Partial<AutomationRule> }
+  | { type: 'REMOVE_AUTOMATION_RULE'; ruleId: string }
+  | { type: 'TOGGLE_AUTOMATION'; enabled?: boolean };
