@@ -82,9 +82,10 @@ const getScalingText = (upgrade: UpgradeDefinition): string => {
 };
 
 const getCompletedTier = (ownedUpgrades: Record<string, number>) => {
+  const tiers = Array.from(new Set(UPGRADE_DEFINITIONS.map((upgrade) => upgrade.tier))).sort((a, b) => a - b);
   let completedTier = 0;
-  for (let tier = 1; tier <= 15; tier += 1) {
-    const tierUpgrades = UPGRADE_DEFINITIONS.filter(upgrade => upgrade.tier === tier);
+  for (const tier of tiers) {
+    const tierUpgrades = UPGRADE_DEFINITIONS.filter((upgrade) => upgrade.tier === tier);
     if (tierUpgrades.every(upgrade => (ownedUpgrades[upgrade.id] ?? 0) > 0)) {
       completedTier = tier;
     } else {
