@@ -1,6 +1,6 @@
 // === GAME STATE CONTEXT & REDUCER ===
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
-import { GameState, GameAction, Machine, GAME_CONFIG } from '@/types/game';
+import { GameState, GameAction, Machine, GAME_CONFIG, AutomationOp } from '@/types/game';
 import { BALANCE, getScrapRefund } from '@/config/balance';
 import { 
   generateId, calculateEarnings, canMerge, getMergedLevel, 
@@ -144,6 +144,40 @@ const resolveCatalogUpgradeCost = (upgradeId: string, currentLevel: number): num
 
   const levelFactor = Math.pow(currentLevel + 1, definition.costGrowth.power);
   return Math.round(definition.baseCost + levelFactor * definition.baseCost * 0.22 * definition.costGrowth.scale);
+};
+
+const executeAutomationOpSafely = (state: GameState, op: AutomationOp): GameState => {
+  const operationAction: GameAction | null = (() => {
+    switch (op.type) {
+      case 'merge_machines': {
+        const source = state.machines.find(machine => machine.id === op.sourceId);
+        const target = state.machines.find(machine => machine.id === op.targetId);
+        if (!source || !target || !canMerge(source, target)) return null;
+        return { type: 'MERGE_MACHINES', sourceId: op.sourceId, targetId: op.targetId };
+      }
+      case 'move_machine': {
+        const machine = state.machines.find(candidate => candidate.id === op.machineId);
+        if (!machine || machine.disabled) return null;
+        const slotOccupied = state.machines.some(candidate => candidate.slotIndex === op.targetSlot);
+        if (slotOccupied) return null;
+        return { type: 'MOVE_MACHINE', machineId: op.machineId, targetSlot: op.targetSlot };
+      }
+      default:
+        return null;
+    }
+  })();
+
+  if (!operationAction) return state;
+
+  const nextState = gameReducer(state, operationAction);
+  if (nextState === state) return state;
+
+  if (nextState.machines === state.machines) return nextState;
+
+  return {
+    ...nextState,
+    upgradeEffectProjection: resolveUpgradeEffects(nextState.ownedUpgrades, nextState.machines),
+  };
 };
 
 // === REDUCER ===
@@ -519,6 +553,12 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
           enabled,
         },
       };
+    }
+
+    case 'RUN_AUTOMATION_OPS': {
+      if (action.ops.length === 0) return state;
+
+      return executeAutomationOpSafely(state, action.ops[0]);
     }
 
     default:
