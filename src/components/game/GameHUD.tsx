@@ -22,11 +22,12 @@ type DebugPurchase =
 
 // Calculate per-row contribution
 const getRowContributions = (machines: Machine[], rowModules: RowModule[]) => {
-  const rows = [
-    { name: 'Top', index: 0, slots: [0, 1, 2] },
-    { name: 'Mid', index: 1, slots: [3, 4, 5] },
-    { name: 'Bot', index: 2, slots: [6, 7, 8] },
-  ];
+  const rowNames = ['Top', 'Mid', 'Bot'] as const;
+  const rows = ([0, 1, 2] as const).map(rowIndex => {
+    const start = rowIndex * BALANCE.gridColumns;
+    const slots = Array.from({ length: BALANCE.gridColumns }, (_, offset) => start + offset);
+    return { name: rowNames[rowIndex], index: rowIndex, slots };
+  });
   
   return rows.map(row => {
     const rowMachines = machines.filter(m => row.slots.includes(m.slotIndex) && !m.disabled);
@@ -63,7 +64,7 @@ export const GameHUD = () => {
   const rowContributions = getRowContributions(state.machines, state.rowModules);
   const effects = resolveGameEffects(state.rowModules, state as RowModule[] & Record<string, unknown>);
 
-  const emptySlots = Array.from({ length: 9 }, (_, index) => index)
+  const emptySlots = Array.from({ length: BALANCE.gridSize }, (_, index) => index)
     .filter(slotIndex => !state.machines.some(machine => machine.slotIndex === slotIndex));
 
   const purchaseOptions: DebugPurchase[] = [

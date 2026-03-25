@@ -50,7 +50,7 @@ const DragPreview = () => {
 const FactoryGridContent = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps) => {
   const { state } = useGame();
 
-  // Create array of 9 slots
+  // Create array of slots from shared grid capacity config.
   const slots = Array.from({ length: GAME_CONFIG.gridSize }, (_, i) => {
     const machine = state.machines.find(m => m.slotIndex === i) || null;
     return { slotIndex: i, machine };
@@ -64,7 +64,7 @@ const FactoryGridContent = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps)
           <RowModulePanel onRowClick={onRowClick} onOpenUpgradeMenu={onOpenUpgradeMenu} />
         )}
         
-        {/* 3x3 Grid */}
+        {/* Fixed 3x3 grid (guarded in balance config). */}
         <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
           {slots.map(({ slotIndex, machine }) => (
             <MachineSlot 
