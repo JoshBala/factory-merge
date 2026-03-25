@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { GameState, GameAction, Disaster, GAME_CONFIG, RowModule } from '@/types/game';
 import { randomInRange, resolveGameEffects } from '@/utils/calculations';
+import { planAutomationOpsFromGameState } from '@/utils/automationPlanner';
 
 interface UseGameLoopProps {
   state: GameState;
@@ -59,6 +60,57 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
       if (accumulatedTimeRef.current >= Math.max(uiUpdateIntervalSeconds, automationTickSeconds)) {
         const deltaMs = accumulatedTimeRef.current * 1000;
         accumulatedTimeRef.current = 0;
+        const currentState = stateRef.current;
+        const plannedOps = planAutomationOpsFromGameState(currentState, now);
+        const firstOp = plannedOps[0];
+
+        if (firstOp) {
+          if (firstOp.kind === 'SKIP') {
+            const blockedReason =
+              firstOp.reason === 'RULE_COOLDOWN'
+                ? 'cooldown'
+                : firstOp.reason === 'AUTOMATION_DISABLED' || firstOp.reason === 'RULE_DISABLED'
+                  ? 'disabled'
+                  : firstOp.reason === 'NO_VALID_TARGET' && currentState.machines.length >= GAME_CONFIG.gridSize
+                    ? 'full_grid'
+                    : 'no_match';
+            dispatch({ type: 'RECORD_AUTOMATION_BLOCKED', reason: blockedReason });
+            if (import.meta.env.DEV) {
+              console.debug('[automation] blocked', {
+                reason: blockedReason,
+                rawReason: firstOp.reason,
+                ruleId: firstOp.ruleId,
+              });
+            }
+          } else if (import.meta.env.DEV) {
+            console.debug('[automation] op', {
+              kind: firstOp.kind,
+              ruleId: firstOp.ruleId,
+            });
+          }
+
+          if (firstOp.kind === 'MERGE') {
+            dispatch({
+              type: 'RUN_AUTOMATION_OPS',
+              ops: [{
+                type: 'merge_machines',
+                sourceId: firstOp.sourceId,
+                targetId: firstOp.targetId,
+                ruleId: firstOp.ruleId,
+              }],
+            });
+          } else if (firstOp.kind === 'MOVE') {
+            dispatch({
+              type: 'RUN_AUTOMATION_OPS',
+              ops: [{
+                type: 'move_machine',
+                machineId: firstOp.machineId,
+                targetSlot: firstOp.targetSlot,
+                ruleId: firstOp.ruleId,
+              }],
+            });
+          }
+        }
 
         // Production tick
         dispatch({ type: 'TICK', deltaMs });

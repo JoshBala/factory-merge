@@ -23,6 +23,16 @@ export const createInitialState = (): GameState => ({
       lastRunAt: null,
       pendingQueue: [],
       opsPerTickBudget: 1,
+      debugMetrics: {
+        attemptedOps: 0,
+        successfulOps: 0,
+        blockedReasons: {
+          no_match: 0,
+          cooldown: 0,
+          disabled: 0,
+          full_grid: 0,
+        },
+      },
     },
   },
   saveVersion: SAVE_VERSION,

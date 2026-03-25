@@ -112,6 +112,7 @@ export const GameHUD = () => {
   const tierProgress = getTierProgress(ownedUpgrades ?? {});
   const completedTiers = getCompletedTier(ownedUpgrades ?? {});
   const activeTier = tierProgress.find(tier => tier.percent < 100) ?? tierProgress[tierProgress.length - 1];
+  const automationMetrics = state.automation.runtime.debugMetrics;
 
   // Update power outage countdown
   useEffect(() => {
@@ -255,6 +256,21 @@ export const GameHUD = () => {
               </div>
             )}
           </div>
+          {import.meta.env.DEV && automationMetrics && (
+            <div className="border-t border-border mt-2 pt-2">
+              <div className="text-muted-foreground mb-1">Automation debug:</div>
+              <div className="flex justify-between">
+                <span>Ops (attempted/success):</span>
+                <span>{automationMetrics.attemptedOps}/{automationMetrics.successfulOps}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Blocked:</span>
+                <span>
+                  match {automationMetrics.blockedReasons.no_match} · cooldown {automationMetrics.blockedReasons.cooldown} · disabled {automationMetrics.blockedReasons.disabled} · full {automationMetrics.blockedReasons.full_grid}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

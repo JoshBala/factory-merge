@@ -56,6 +56,7 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
 
 const migrateAutomationState = (automation: Partial<GameState>['automation']): GameState['automation'] => {
   const runtime = automation?.runtime;
+  const blockedReasons = runtime?.debugMetrics?.blockedReasons;
 
   return {
     enabled: automation?.enabled ?? false,
@@ -69,6 +70,34 @@ const migrateAutomationState = (automation: Partial<GameState>['automation']): G
         typeof runtime?.opsPerTickBudget === 'number' && Number.isFinite(runtime.opsPerTickBudget) && runtime.opsPerTickBudget > 0
           ? Math.floor(runtime.opsPerTickBudget)
           : 1,
+      debugMetrics: {
+        attemptedOps:
+          typeof runtime?.debugMetrics?.attemptedOps === 'number' && Number.isFinite(runtime.debugMetrics.attemptedOps)
+            ? Math.max(0, Math.floor(runtime.debugMetrics.attemptedOps))
+            : 0,
+        successfulOps:
+          typeof runtime?.debugMetrics?.successfulOps === 'number' && Number.isFinite(runtime.debugMetrics.successfulOps)
+            ? Math.max(0, Math.floor(runtime.debugMetrics.successfulOps))
+            : 0,
+        blockedReasons: {
+          no_match:
+            typeof blockedReasons?.no_match === 'number' && Number.isFinite(blockedReasons.no_match)
+              ? Math.max(0, Math.floor(blockedReasons.no_match))
+              : 0,
+          cooldown:
+            typeof blockedReasons?.cooldown === 'number' && Number.isFinite(blockedReasons.cooldown)
+              ? Math.max(0, Math.floor(blockedReasons.cooldown))
+              : 0,
+          disabled:
+            typeof blockedReasons?.disabled === 'number' && Number.isFinite(blockedReasons.disabled)
+              ? Math.max(0, Math.floor(blockedReasons.disabled))
+              : 0,
+          full_grid:
+            typeof blockedReasons?.full_grid === 'number' && Number.isFinite(blockedReasons.full_grid)
+              ? Math.max(0, Math.floor(blockedReasons.full_grid))
+              : 0,
+        },
+      },
     },
   };
 };
