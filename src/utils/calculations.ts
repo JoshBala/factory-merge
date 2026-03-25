@@ -76,6 +76,28 @@ export interface ResolvedGameEffects {
   machineCostMultiplier: number;
 }
 
+const MIN_AUTOMATION_INTERVAL_MS = 50;
+const MAX_AUTOMATION_INTERVAL_MS = 60_000;
+
+/**
+ * Centralized automation interval resolver.
+ *
+ * Keep this aligned with:
+ * - upgrade automation effects from `src/utils/upgradeEffects.ts` (`automationSpeedPercent`)
+ * - row module bonus kinds from `src/types/game.ts` (`BonusKind: 'automationSpeed'`)
+ *
+ * This gives us one integration point whenever new automation-related effects are added.
+ */
+export const resolveAutomationIntervalMs = (
+  rowAutomationSpeedPercent: number,
+  upgradeAutomationSpeedPercent: number
+): number => {
+  const totalAutomationSpeedPercent = rowAutomationSpeedPercent + upgradeAutomationSpeedPercent;
+  const intervalMs = BASE_TICK_INTERVAL_MS / Math.max(0.05, 1 + totalAutomationSpeedPercent / 100);
+
+  return Math.min(MAX_AUTOMATION_INTERVAL_MS, Math.max(MIN_AUTOMATION_INTERVAL_MS, intervalMs));
+};
+
 const resolveRowBonusPercents = (
   rowModules: RowModule[]
 ): Record<RowIndex, Record<BonusKind, number>> => {
@@ -135,7 +157,10 @@ export const resolveGameEffects = (
     0,
     productionMultiplier * (1 + byKindPercent.productionAfterMerge / 100)
   );
-  const automationIntervalMs = BASE_TICK_INTERVAL_MS / Math.max(0.05, 1 + byKindPercent.automationSpeed / 100);
+  const automationIntervalMs = resolveAutomationIntervalMs(
+    rowBonusPercents[0].automationSpeed + rowBonusPercents[1].automationSpeed + rowBonusPercents[2].automationSpeed,
+    upgradePercents.automationSpeed
+  );
   const disasterChance = Math.min(0.95, Math.max(0, GAME_CONFIG.disasterChance * (1 + byKindPercent.disasterChanceIncrease / 100)));
   const disasterDurationMultiplier = Math.max(0.2, 1 - Math.min(80, Math.max(0, byKindPercent.disasterDurationReduction)) / 100);
   const disasterResolutionRewardMultiplier = Math.max(0, 1 + byKindPercent.disasterResolutionReward / 100);

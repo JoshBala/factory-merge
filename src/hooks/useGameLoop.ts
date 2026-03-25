@@ -2,7 +2,7 @@
 // Handles production ticks and disaster generation
 import { useEffect, useRef } from 'react';
 import { GameState, GameAction, Disaster, GAME_CONFIG, RowModule } from '@/types/game';
-import { randomInRange, resolveGameEffects } from '@/utils/calculations';
+import { getEffectiveAutomationInterval, randomInRange, resolveGameEffects } from '@/utils/calculations';
 
 interface UseGameLoopProps {
   state: GameState;
@@ -55,7 +55,7 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
         }
       }
 
-      const automationTickSeconds = resolveGameEffects(stateRef.current.rowModules, stateRef.current).automationIntervalMs / 1000;
+      const automationTickSeconds = getEffectiveAutomationInterval(stateRef.current) / 1000;
       if (accumulatedTimeRef.current >= Math.max(uiUpdateIntervalSeconds, automationTickSeconds)) {
         const deltaMs = accumulatedTimeRef.current * 1000;
         accumulatedTimeRef.current = 0;
