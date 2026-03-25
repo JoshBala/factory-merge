@@ -418,6 +418,23 @@ export const getCompletedTier = (ownedUpgrades: Partial<Record<UpgradeId, number
   return completedTier;
 };
 
+export interface TierProgress {
+  tier: number;
+  unlocked: number;
+  total: number;
+  percent: number;
+}
+
+export const getTierProgress = (ownedUpgrades: Partial<Record<UpgradeId, number>>): TierProgress[] => {
+  return Object.entries(UPGRADES_BY_TIER)
+    .map(([tier, upgrades]) => {
+      const unlocked = upgrades.filter((upgrade) => (ownedUpgrades[upgrade.id] ?? 0) > 0).length;
+      const percent = upgrades.length > 0 ? (unlocked / upgrades.length) * 100 : 0;
+      return { tier: Number(tier), unlocked, total: upgrades.length, percent };
+    })
+    .sort((a, b) => a.tier - b.tier);
+};
+
 export const getUpgradeLockReasons = (
   upgrade: UpgradeDefinition,
   context: {

@@ -14,7 +14,7 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { BALANCE, getProductionRate } from '@/config/balance';
 import { GameMenuModal } from './GameMenuModal';
-import { UPGRADES_BY_TIER } from '@/config/upgrades';
+import { getCompletedTier, getTierProgress } from '@/config/upgrades';
 
 type DebugPurchase =
   | { key: string; label: string; cost: number; kind: 'machine'; slotIndex: number }
@@ -108,12 +108,8 @@ export const GameHUD = () => {
     : null;
 
   const ownedUpgrades = (state as Record<string, unknown>).ownedUpgrades as Record<string, number> | undefined;
-  const tierProgress = Object.entries(UPGRADES_BY_TIER).map(([tier, upgrades]) => {
-    const unlocked = upgrades.filter(upgrade => (ownedUpgrades?.[upgrade.id] ?? 0) > 0).length;
-    const percent = upgrades.length > 0 ? (unlocked / upgrades.length) * 100 : 0;
-    return { tier: Number(tier), unlocked, total: upgrades.length, percent };
-  });
-  const completedTiers = tierProgress.filter(tier => tier.percent >= 100).length;
+  const tierProgress = getTierProgress(ownedUpgrades ?? {});
+  const completedTiers = getCompletedTier(ownedUpgrades ?? {});
   const activeTier = tierProgress.find(tier => tier.percent < 100) ?? tierProgress[tierProgress.length - 1];
 
   // Update power outage countdown

@@ -35,6 +35,8 @@ const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
   quality_of_life: 'QoL',
 };
 
+const getTopLockReasons = (lockReasons: string[]): string[] => lockReasons.slice(0, 2);
+
 const getUpgradeCost = (upgrade: UpgradeDefinition, currentLevel: number) => {
   if (currentLevel >= upgrade.maxLevel) return Number.POSITIVE_INFINITY;
 
@@ -87,18 +89,20 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
   const [categoryFilter, setCategoryFilter] = useState<UpgradeCategory | 'all'>('all');
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
 
-  const ownedUpgrades = ((state as Record<string, unknown>).ownedUpgrades ?? {}) as Record<string, number>;
-  const highestMachine = state.stats.highestMachineLevel;
-  const completedTier = getCompletedTier(ownedUpgrades);
-  const context = {
-    ownedUpgrades,
-    completedTier,
-    currencyTotal: state.stats.lifetimeCurrencyEarned,
-    machineLevel: highestMachine,
-    ownedMachines: state.machines.length,
-  };
+  const ownedUpgrades = useMemo(
+    () => ((state as Record<string, unknown>).ownedUpgrades ?? {}) as Record<string, number>,
+    [state]
+  );
 
   const upgradeRows = useMemo(() => {
+    const context = {
+      ownedUpgrades,
+      completedTier: getCompletedTier(ownedUpgrades),
+      currencyTotal: state.stats.lifetimeCurrencyEarned,
+      machineLevel: state.stats.highestMachineLevel,
+      ownedMachines: state.machines.length,
+    };
+
     return UPGRADE_DEFINITIONS
       .map((upgrade, index) => {
         const currentLevel = ownedUpgrades[upgrade.id] ?? 0;
@@ -121,7 +125,14 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
       .filter(item => item.revealed)
       .filter(item => categoryFilter === 'all' || item.upgrade.category === categoryFilter)
       .filter(item => tierFilter === 'all' || item.upgrade.tier === tierFilter);
-  }, [categoryFilter, context, ownedUpgrades, tierFilter]);
+  }, [
+    categoryFilter,
+    ownedUpgrades,
+    state.machines.length,
+    state.stats.highestMachineLevel,
+    state.stats.lifetimeCurrencyEarned,
+    tierFilter,
+  ]);
 
   const availableNow = upgradeRows.filter(item => item.canBuy && state.currency >= item.cost);
 
@@ -227,6 +238,25 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
               <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {upgradeRows.map(({ upgrade, currentLevel, nextLevel, cost, canBuy, lockReasons }) => {
                   const atMax = currentLevel >= upgrade.maxLevel;
+                  const isAffordable = state.currency >= cost;
+                  const isLocked = !atMax && lockReasons.length > 0;
+                  const canBuyNow = !atMax && canBuy && isAffordable;
+                  const topLockReasons = getTopLockReasons(lockReasons);
+                  const statusLabel = atMax
+                    ? 'Maxed'
+                    : isLocked
+                      ? 'Locked'
+                      : isAffordable
+                        ? 'Ready'
+                        : 'Unlocked • Need currency';
+                  const statusClassName = atMax
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                    : isLocked
+                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                      : isAffordable
+                        ? 'bg-primary/15 text-primary'
+                        : 'bg-blue-500/15 text-blue-600 dark:text-blue-400';
+
                   return (
                     <article key={upgrade.id} className="rounded-lg border border-border p-3 bg-card/50 space-y-2">
                       <div className="flex items-start justify-between gap-2">
@@ -234,7 +264,10 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
                           <h4 className="font-semibold text-sm leading-tight">{upgrade.name}</h4>
                           <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[upgrade.category]} • T{upgrade.tier}</p>
                         </div>
-                        <span className="text-xs rounded bg-muted px-2 py-0.5">Lv {currentLevel}/{upgrade.maxLevel}</span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-xs rounded bg-muted px-2 py-0.5">Lv {currentLevel}/{upgrade.maxLevel}</span>
+                          <span className={`text-[10px] rounded px-2 py-0.5 ${statusClassName}`}>{statusLabel}</span>
+                        </div>
                       </div>
 
                       <p className="text-xs text-muted-foreground">{upgrade.description}</p>
@@ -242,8 +275,14 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
 
                       <div className="text-xs text-muted-foreground">Cost: {atMax ? 'MAX' : formatCurrency(cost)}</div>
 
-                      {!atMax && lockReasons.length > 0 && (
-                        <p className="text-xs text-amber-500">{lockReasons[0]}</p>
+                      {!atMax && topLockReasons.length > 0 && (
+                        <div className="space-y-1">
+                          {topLockReasons.map((reason, index) => (
+                            <p key={`${upgrade.id}-reason-${index}`} className="text-xs text-amber-500">
+                              {index === 0 ? `Primary lock: ${reason}` : `Secondary lock: ${reason}`}
+                            </p>
+                          ))}
+                        </div>
                       )}
 
                       <div className="flex items-center justify-between">
@@ -273,10 +312,10 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
 
                         <Button
                           size="sm"
-                          disabled={atMax || !canBuy || state.currency < cost}
+                          disabled={atMax || !canBuyNow}
                           onClick={() => actions.buyUpgrade(upgrade.id)}
                         >
-                          {atMax ? 'Maxed' : 'Buy'}
+                          {atMax ? 'Maxed' : canBuyNow ? 'Buy' : isLocked ? 'Locked' : 'Need currency'}
                         </Button>
                       </div>
                     </article>
