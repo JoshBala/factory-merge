@@ -4,6 +4,7 @@ import {
   UpgradeCategory,
   UpgradeDefinition,
   UPGRADE_DEFINITIONS,
+  getCompletedTier,
   getUpgradeLockReasons,
 } from '@/config/upgrades';
 import { formatCurrency } from '@/utils/calculations';
@@ -79,20 +80,6 @@ const getScalingText = (upgrade: UpgradeDefinition): string => {
     return `Cost scales exponentially (x${upgrade.costGrowth.factor.toFixed(2)} per level).`;
   }
   return `Cost scales polynomially (power ${upgrade.costGrowth.power.toFixed(2)}, scale ${upgrade.costGrowth.scale.toFixed(2)}).`;
-};
-
-const getCompletedTier = (ownedUpgrades: Record<string, number>) => {
-  const tiers = Array.from(new Set(UPGRADE_DEFINITIONS.map((upgrade) => upgrade.tier))).sort((a, b) => a - b);
-  let completedTier = 0;
-  for (const tier of tiers) {
-    const tierUpgrades = UPGRADE_DEFINITIONS.filter((upgrade) => upgrade.tier === tier);
-    if (tierUpgrades.every(upgrade => (ownedUpgrades[upgrade.id] ?? 0) > 0)) {
-      completedTier = tier;
-    } else {
-      break;
-    }
-  }
-  return completedTier;
 };
 
 export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {

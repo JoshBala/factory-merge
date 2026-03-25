@@ -10,7 +10,7 @@ import {
 import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
 import { createInitialState } from '@/utils/state';
-import { UPGRADE_BY_ID } from '@/config/upgrades';
+import { UPGRADE_BY_ID, getCompletedTier, getUpgradeLockReasons } from '@/config/upgrades';
 
 type DynamicState = GameState & Record<string, unknown>;
 
@@ -405,6 +405,16 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
 
       const catalogUpgrade = UPGRADE_BY_ID[action.upgradeId];
       if (catalogUpgrade) {
+        const unlockContext = {
+          ownedUpgrades,
+          completedTier: getCompletedTier(ownedUpgrades),
+          currencyTotal: state.stats.lifetimeCurrencyEarned,
+          machineLevel: state.stats.highestMachineLevel,
+          ownedMachines: state.machines.length,
+        };
+        const lockReasons = getUpgradeLockReasons(catalogUpgrade, unlockContext);
+        if (lockReasons.length > 0) return state;
+
         if (currentLevel >= catalogUpgrade.maxLevel) return state;
         const cost = resolveCatalogUpgradeCost(action.upgradeId, currentLevel);
         if (cost === null || state.currency < cost) return state;
