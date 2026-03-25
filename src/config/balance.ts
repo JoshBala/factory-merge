@@ -11,6 +11,9 @@ export const BASE_MACHINE_VALUE_GROWTH = 2.5;
 export const BASE_TICK_INTERVAL_MS = 1000;
 export const BASE_AUTO_SAVE_INTERVAL_MS = 10000;
 export const BASE_DISASTER_CHECK_INTERVAL_MS = 30000;
+export const GRID_COLUMNS = 3;
+export const GRID_ROWS = 3;
+export const GRID_SIZE = GRID_COLUMNS * GRID_ROWS;
 
 export const BALANCE = {
   // === MACHINE PRODUCTION ===
@@ -26,7 +29,13 @@ export const BALANCE = {
   repairCostMultiplier: 0.5,     // Repair costs 50% of value
 
   // === GRID ===
-  gridSize: 9,                   // 3x3 grid
+  // NOTE: The current game design intentionally assumes a fixed 3x3 playfield:
+  // - Row modules are strongly typed to row indexes 0 | 1 | 2.
+  // - Row upgrade/unlock formulas and UI labels are authored for exactly 3 rows.
+  // If you change rows/columns, update row-related types/formulas/components first.
+  gridColumns: GRID_COLUMNS,
+  gridRows: GRID_ROWS,
+  gridSize: GRID_SIZE,
 
   // === TIMING (milliseconds) ===
   tickIntervalMs: BASE_TICK_INTERVAL_MS,             // Game tick every 1s
@@ -51,6 +60,19 @@ export const BALANCE = {
   } as Record<string, number>,
   rerollBaseCost: 50,            // Base cost for rerolling bonuses
 } as const;
+
+// Guardrail: keep runtime config coherent for all row-based formulas.
+if (BALANCE.gridColumns * BALANCE.gridRows !== BALANCE.gridSize) {
+  throw new Error(
+    `Invalid BALANCE grid config: gridColumns (${BALANCE.gridColumns}) * gridRows (${BALANCE.gridRows}) must equal gridSize (${BALANCE.gridSize}).`
+  );
+}
+
+if (BALANCE.gridRows !== 3 || BALANCE.gridColumns !== 3) {
+  throw new Error(
+    `Unsupported grid dimensions ${BALANCE.gridColumns}x${BALANCE.gridRows}. Current row-module and unlock formulas are intentionally fixed to 3x3.`
+  );
+}
 
 // === HELPER FUNCTIONS ===
 

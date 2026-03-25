@@ -55,6 +55,15 @@ const TIER_MAX = 15;
 const UPGRADES_PER_TIER = 8;
 const MIN_OWNED_MACHINE_REQUIREMENT = 2;
 const MAX_OWNED_MACHINE_REQUIREMENT = BALANCE.gridSize;
+
+// Guardrail: these unlock curves are tuned for a fixed 3x3 capacity.
+// If grid dimensions change, re-tune tier pacing before removing this check.
+if (BALANCE.gridRows !== 3 || BALANCE.gridColumns !== 3) {
+  throw new Error(
+    `Unsupported grid ${BALANCE.gridColumns}x${BALANCE.gridRows} for upgrades unlock formulas. Expected fixed 3x3.`
+  );
+}
+
 const LINE_BALANCER_OWNED_MACHINE_START = MIN_OWNED_MACHINE_REQUIREMENT;
 const LINE_BALANCER_OWNED_MACHINE_END = Math.max(
   MIN_OWNED_MACHINE_REQUIREMENT,

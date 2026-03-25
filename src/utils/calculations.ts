@@ -286,9 +286,9 @@ export const getBonusDisplayName = (type: BonusKind): string => {
 // Calculate actual bonus value from normalized roll
 export const calculateBonusValue = (bonus: RowBonus): number => bonus.value;
 
-// Get row index for a slot (0-2 = row 0, 3-5 = row 1, 6-8 = row 2)
+// Get row index for a slot in the fixed 3x3 layout.
 export const getRowForSlot = (slotIndex: number): 0 | 1 | 2 => {
-  return Math.floor(slotIndex / 3) as 0 | 1 | 2;
+  return Math.floor(slotIndex / BALANCE.gridColumns) as 0 | 1 | 2;
 };
 
 // Get next rarity in progression
