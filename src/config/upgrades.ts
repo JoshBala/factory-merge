@@ -402,6 +402,22 @@ export const UPGRADES_BY_CATEGORY: Record<UpgradeCategory, UpgradeDefinition[]> 
     } as Record<UpgradeCategory, UpgradeDefinition[]>
   );
 
+export const getCompletedTier = (ownedUpgrades: Partial<Record<UpgradeId, number>>): number => {
+  const tiers = Array.from(new Set(UPGRADE_DEFINITIONS.map((upgrade) => upgrade.tier))).sort((a, b) => a - b);
+  let completedTier = 0;
+
+  for (const tier of tiers) {
+    const tierUpgrades = UPGRADE_DEFINITIONS.filter((upgrade) => upgrade.tier === tier);
+    if (tierUpgrades.every((upgrade) => (ownedUpgrades[upgrade.id] ?? 0) > 0)) {
+      completedTier = tier;
+    } else {
+      break;
+    }
+  }
+
+  return completedTier;
+};
+
 export const getUpgradeLockReasons = (
   upgrade: UpgradeDefinition,
   context: {
