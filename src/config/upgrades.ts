@@ -246,7 +246,7 @@ const UPGRADE_BLUEPRINTS: Array<{
     unlockBuilder: (tier) => ({
       requiresUpgrades: [`u_t${tier}_compound_matrix`],
       requiresCurrencyTotal: Math.round(680 * Math.pow(1.87, tier - 1)),
-      requiresTierComplete: tier,
+      requiresTierComplete: Math.max(0, tier - 1),
     }),
   },
 ];
@@ -290,6 +290,68 @@ const makeTierUpgrades = (tier: number): UpgradeDefinition[] => {
   }));
 };
 
+const validateTierUpgradePaths = (upgrades: UpgradeDefinition[]): void => {
+  const tiers = Array.from(new Set(upgrades.map((upgrade) => upgrade.tier))).sort((a, b) => a - b);
+  const impossibleNodes: string[] = [];
+
+  for (const tier of tiers) {
+    const tierUpgrades = upgrades.filter((upgrade) => upgrade.tier === tier);
+    const ownedUpgrades = new Set<UpgradeId>();
+    let progressed = true;
+
+    while (progressed && ownedUpgrades.size < tierUpgrades.length) {
+      progressed = false;
+
+      for (const upgrade of tierUpgrades) {
+        if (ownedUpgrades.has(upgrade.id)) {
+          continue;
+        }
+
+        const requirements = upgrade.unlockRequirements;
+        const canSatisfyTierGate = (requirements.requiresTierComplete ?? 0) <= tier - 1;
+        const canSatisfyOwnedMachines = (requirements.requiresOwnedMachines ?? 0) <= MAX_OWNED_MACHINE_REQUIREMENT;
+        const canSatisfyDependencies = (requirements.requiresUpgrades ?? []).every((upgradeId) => {
+          const dependencyTier = UPGRADE_BY_ID[upgradeId]?.tier ?? 0;
+          if (dependencyTier > 0 && dependencyTier < tier) {
+            return true;
+          }
+          return ownedUpgrades.has(upgradeId);
+        });
+
+        if (canSatisfyTierGate && canSatisfyOwnedMachines && canSatisfyDependencies) {
+          ownedUpgrades.add(upgrade.id);
+          progressed = true;
+        }
+      }
+    }
+
+    for (const upgrade of tierUpgrades) {
+      if (!ownedUpgrades.has(upgrade.id)) {
+        impossibleNodes.push(upgrade.id);
+      }
+    }
+
+    if (ownedUpgrades.size === 0 || ownedUpgrades.size < tierUpgrades.length) {
+      const reason = `Tier ${tier} has no full satisfiable unlock path under configured caps`;
+      if (import.meta.env.DEV) {
+        console.error(`[upgrades] ${reason}`, {
+          tier,
+          unlocked: Array.from(ownedUpgrades),
+          total: tierUpgrades.map((upgrade) => upgrade.id),
+        });
+      }
+    }
+  }
+
+  if (impossibleNodes.length > 0) {
+    const reason = `[upgrades] Impossible unlock nodes detected: ${impossibleNodes.join(', ')}`;
+    if (import.meta.env.DEV) {
+      console.error(reason);
+      throw new Error(reason);
+    }
+  }
+};
+
 export const UPGRADE_DEFINITIONS: UpgradeDefinition[] = Array.from(
   { length: TIER_MAX - TIER_MIN + 1 },
   (_, index) => makeTierUpgrades(TIER_MIN + index)
@@ -298,6 +360,8 @@ export const UPGRADE_DEFINITIONS: UpgradeDefinition[] = Array.from(
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDefinition> = Object.fromEntries(
   UPGRADE_DEFINITIONS.map((upgrade) => [upgrade.id, upgrade])
 );
+
+validateTierUpgradePaths(UPGRADE_DEFINITIONS);
 
 export const UPGRADES_BY_TIER: Record<number, UpgradeDefinition[]> = UPGRADE_DEFINITIONS.reduce(
   (acc, upgrade) => {
