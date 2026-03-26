@@ -1,7 +1,7 @@
 // === GAME CALCULATIONS ===
 import { 
   Machine, GAME_CONFIG, 
-  RowModule, GridModule, Rarity, BonusKind, RowBonus, GameState,
+  GridModule, Rarity, BonusKind, RowBonus, GameState,
   BONUS_RANGES, RARITY_BONUS_COUNT 
 } from '@/types/game';
 import { 
@@ -28,44 +28,20 @@ export const generateId = (): string =>
  */
 type UpgradeAwareState = GameState;
 
-type RowIndex = 0 | 1 | 2;
-
-const EMPTY_ROW_BONUSES: Record<RowIndex, Record<BonusKind, number>> = {
-  0: {
-    productionPercent: 0,
-    productionAfterMerge: 0,
-    disasterDurationReduction: 0,
-    disasterChanceIncrease: 0,
-    disasterResolutionReward: 0,
-    upgradeCostReduction: 0,
-    automationSpeed: 0,
-    offlineEarningsPercent: 0,
-  },
-  1: {
-    productionPercent: 0,
-    productionAfterMerge: 0,
-    disasterDurationReduction: 0,
-    disasterChanceIncrease: 0,
-    disasterResolutionReward: 0,
-    upgradeCostReduction: 0,
-    automationSpeed: 0,
-    offlineEarningsPercent: 0,
-  },
-  2: {
-    productionPercent: 0,
-    productionAfterMerge: 0,
-    disasterDurationReduction: 0,
-    disasterChanceIncrease: 0,
-    disasterResolutionReward: 0,
-    upgradeCostReduction: 0,
-    automationSpeed: 0,
-    offlineEarningsPercent: 0,
-  },
+const EMPTY_GRID_BONUSES: Record<BonusKind, number> = {
+  productionPercent: 0,
+  productionAfterMerge: 0,
+  disasterDurationReduction: 0,
+  disasterChanceIncrease: 0,
+  disasterResolutionReward: 0,
+  upgradeCostReduction: 0,
+  automationSpeed: 0,
+  offlineEarningsPercent: 0,
 };
 
 export interface ResolvedGameEffects {
   byKindPercent: Record<BonusKind, number>;
-  byRowPercent: Record<RowIndex, Record<BonusKind, number>>;
+  byGridPercent: Record<BonusKind, number>;
   productionMultiplier: number;
   mergedProductionMultiplier: number;
   automationIntervalMs: number;
@@ -98,22 +74,14 @@ export const resolveAutomationIntervalMs = (
   return Math.min(MAX_AUTOMATION_INTERVAL_MS, Math.max(MIN_AUTOMATION_INTERVAL_MS, intervalMs));
 };
 
-const resolveRowBonusPercents = (
-  gridUpgrade: GridModule | null
-): Record<RowIndex, Record<BonusKind, number>> => {
-  const totals: Record<RowIndex, Record<BonusKind, number>> = {
-    0: { ...EMPTY_ROW_BONUSES[0] },
-    1: { ...EMPTY_ROW_BONUSES[1] },
-    2: { ...EMPTY_ROW_BONUSES[2] },
-  };
+const resolveGridBonusPercents = (gridUpgrade: GridModule | null): Record<BonusKind, number> => {
+  const totals: Record<BonusKind, number> = { ...EMPTY_GRID_BONUSES };
 
   if (!gridUpgrade) return totals;
 
   for (const bonus of gridUpgrade.bonuses) {
     const value = calculateBonusValue(bonus);
-    totals[0][bonus.kind] += value;
-    totals[1][bonus.kind] += value;
-    totals[2][bonus.kind] += value;
+    totals[bonus.kind] += value;
   }
 
   return totals;
@@ -121,7 +89,7 @@ const resolveRowBonusPercents = (
 
 const resolveGlobalUpgradePercents = (state?: UpgradeAwareState): Record<BonusKind, number> => {
   if (!state) {
-    return { ...EMPTY_ROW_BONUSES[0] };
+    return { ...EMPTY_GRID_BONUSES };
   }
 
   const projection = resolveUpgradeEffects(state.ownedUpgrades ?? {}, state.machines);
@@ -144,23 +112,21 @@ export const resolveGameEffects = (
   state?: UpgradeAwareState
 ): ResolvedGameEffects => {
   const effectiveGridUpgrade = gridUpgrade ?? state?.gridUpgrade ?? null;
-  const rowBonusPercents = resolveRowBonusPercents(effectiveGridUpgrade);
+  const gridBonusPercents = resolveGridBonusPercents(effectiveGridUpgrade);
   const upgradePercents = resolveGlobalUpgradePercents(state);
-  const byKindPercent = Object.keys(EMPTY_ROW_BONUSES[0]).reduce((acc, key) => {
+  const byKindPercent = Object.keys(EMPTY_GRID_BONUSES).reduce((acc, key) => {
     const kind = key as BonusKind;
-    acc[kind] = upgradePercents[kind] + rowBonusPercents[0][kind];
+    acc[kind] = upgradePercents[kind] + gridBonusPercents[kind];
     return acc;
-  }, { ...EMPTY_ROW_BONUSES[0] });
+  }, { ...EMPTY_GRID_BONUSES });
 
-  // Keep this multiplier global-only (upgrades/non-row effects).
-  // Row production bonuses are applied per-machine in production/offline formulas.
-  const productionMultiplier = Math.max(0, 1 + upgradePercents.productionPercent / 100);
+  const productionMultiplier = Math.max(0, 1 + byKindPercent.productionPercent / 100);
   const mergedProductionMultiplier = Math.max(
     0,
     productionMultiplier * (1 + byKindPercent.productionAfterMerge / 100)
   );
   const automationIntervalMs = resolveAutomationIntervalMs(
-    rowBonusPercents[0].automationSpeed,
+    gridBonusPercents.automationSpeed,
     upgradePercents.automationSpeed
   );
   const disasterChance = Math.min(0.95, Math.max(0, GAME_CONFIG.disasterChance * (1 + byKindPercent.disasterChanceIncrease / 100)));
@@ -171,7 +137,7 @@ export const resolveGameEffects = (
 
   return {
     byKindPercent,
-    byRowPercent: rowBonusPercents,
+    byGridPercent: gridBonusPercents,
     productionMultiplier,
     mergedProductionMultiplier,
     automationIntervalMs,
@@ -190,10 +156,9 @@ const getMachineRateWithResolvedEffects = (
   if (machine.disabled) return 0;
 
   const baseRate = getProductionRate(machine.level);
-  const rowBonusMultiplier = 1 + effects.byKindPercent.productionPercent / 100;
   const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
 
-  return baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
+  return baseRate * effects.productionMultiplier * mergeBonusMultiplier;
 };
 
 /**
@@ -279,11 +244,6 @@ export const getBonusDisplayName = (type: BonusKind): string => {
 // Calculate actual bonus value from normalized roll
 export const calculateBonusValue = (bonus: RowBonus): number => bonus.value;
 
-// Get row index for a slot in the fixed 3x3 layout.
-export const getRowForSlot = (slotIndex: number): 0 | 1 | 2 => {
-  return Math.floor(slotIndex / BALANCE.gridColumns) as 0 | 1 | 2;
-};
-
 // Get next rarity in progression
 export const getNextRarity = (rarity: Rarity): Rarity | null => {
   const progression: Rarity[] = ['common', 'uncommon', 'rare', 'epic'];
@@ -300,8 +260,8 @@ export const getGridUpgradeCost = (gridUpgrade: GridModule | null): number => {
   return nextRarity ? GAME_CONFIG.rowModuleCosts[nextRarity] : 0;
 };
 
-// Get reroll cost for a row
-export const getRerollCost = (): number => GAME_CONFIG.rerollBaseCost;
+// Get reroll cost for the grid module
+export const getGridRerollCost = (): number => GAME_CONFIG.rerollBaseCost;
 
 // Generate a random bonus (avoids existing types)
 const getRandomBonusKind = (): BonusKind =>
@@ -364,38 +324,21 @@ export const rerollGridBonuses = (module: GridModule): GridModule => ({
   ),
 });
 
-// Calculate total production bonus for machines in a specific row
-export const getRowProductionBonus = (
+// Calculate total production bonus for the active grid module
+export const getGridProductionBonus = (
   gridUpgrade: GridModule | null
 ): number => {
   const effects = resolveGameEffects(gridUpgrade);
   return effects.byKindPercent.productionPercent / 100;
 };
 
-// Calculate disaster duration reduction for a specific row
-export const getDisasterDurationReduction = (
+// Calculate disaster duration reduction from the active grid module
+export const getGridDisasterDurationReduction = (
   gridUpgrade: GridModule | null
 ): number => {
   const effects = resolveGameEffects(gridUpgrade);
   return effects.byKindPercent.disasterDurationReduction / 100;
 };
-
-
-// Legacy wrappers for compatibility
-export const getRowUpgradeCost = (rowModule: RowModule | undefined): number =>
-  getGridUpgradeCost(rowModule ?? null);
-export const createRowModule = (rowIndex: 0 | 1 | 2): RowModule => ({
-  rowIndex,
-  ...createGridModule(),
-});
-export const upgradeRowModule = (module: RowModule): RowModule | null => {
-  const upgraded = upgradeGridModule(module);
-  return upgraded ? { ...upgraded, rowIndex: module.rowIndex } : null;
-};
-export const rerollRowBonuses = (module: RowModule): RowModule => ({
-  ...rerollGridBonuses(module),
-  rowIndex: module.rowIndex,
-});
 // === PRODUCTION CALCULATIONS ===
 
 /**

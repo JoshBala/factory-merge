@@ -1,7 +1,7 @@
 import type { AutomationRule, AutomationState, GameState, Machine } from '@/types/game';
 import { BALANCE } from '@/config/balance';
 import { EMPTY_UPGRADE_EFFECT_PROJECTION, type UpgradeEffectProjection } from '@/utils/upgradeEffects';
-import { canMerge, getRowForSlot } from '@/utils/calculations';
+import { canMerge } from '@/utils/calculations';
 
 export type AutomationOp =
   | {
@@ -52,7 +52,7 @@ const slotMatchesFilter = (slotIndex: number, slotFilter: number[]): boolean => 
 
 const rowMatchesFilter = (slotIndex: number, rowFilter: Array<0 | 1 | 2>): boolean => {
   if (rowFilter.length === 0) return true;
-  return rowFilter.includes(getRowForSlot(slotIndex));
+  return rowFilter.includes(Math.floor(slotIndex / BALANCE.gridColumns) as 0 | 1 | 2);
 };
 
 const machineMatchesSource = (machine: Machine, rule: AutomationRule): boolean => {
