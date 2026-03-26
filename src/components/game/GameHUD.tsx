@@ -37,11 +37,11 @@ const getRowContributions = (
     const rowMachines = machines.filter(m => row.slots.includes(m.slotIndex) && !m.disabled);
     // Use procedural production rate
     const baseRate = rowMachines.reduce((sum, m) => sum + getProductionRate(m.level), 0);
-    const bonus = effects.byRowPercent[row.index].productionPercent / 100;
+    const bonus = effects.byGridPercent.productionPercent / 100;
     const modifiedRate = rowMachines.reduce((sum, machine) => {
-      const rowBonusMultiplier = 1 + effects.byRowPercent[row.index].productionPercent / 100;
+      const gridBonusMultiplier = 1 + effects.byGridPercent.productionPercent / 100;
       const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
-      return sum + getProductionRate(machine.level) * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
+      return sum + getProductionRate(machine.level) * gridBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
     }, 0);
     return {
       name: row.name,
