@@ -12,6 +12,7 @@ import { migrateGameState } from '@/utils/migrations';
 import { createInitialState } from '@/utils/state';
 import { UPGRADE_BY_ID, getCompletedTier, getUpgradeLockReasons } from '@/config/upgrades';
 import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
+import { getMachinePurchaseCost, getUpgradePurchaseCost } from '@/utils/costs';
 import {
   createAddPresetAutomationRuleIntent,
   createRemoveLatestAutomationRuleIntent,
@@ -139,18 +140,6 @@ const applyUpgradeCost = (state: GameState, costs: Record<string, number>): Game
 };
 
 
-const resolveCatalogUpgradeCost = (upgradeId: string, currentLevel: number): number | null => {
-  const definition = UPGRADE_BY_ID[upgradeId];
-  if (!definition || currentLevel >= definition.maxLevel) return null;
-
-  if (definition.costGrowth.kind === "exponential") {
-    return Math.round(definition.baseCost * Math.pow(definition.costGrowth.factor, currentLevel));
-  }
-
-  const levelFactor = Math.pow(currentLevel + 1, definition.costGrowth.power);
-  return Math.round(definition.baseCost + levelFactor * definition.baseCost * 0.22 * definition.costGrowth.scale);
-};
-
 const withBlockedMetric = (state: GameState, reason: AutomationBlockedReason): GameState => {
   const debugMetrics = state.automation.runtime.debugMetrics ?? {
     attemptedOps: 0,
@@ -273,7 +262,8 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
     }
 
     case 'BUY_MACHINE': {
-      if (state.currency < BALANCE.baseMachineCost) return state;
+      const machineCost = getMachinePurchaseCost(state);
+      if (state.currency < machineCost) return state;
       
       const newMachine: Machine = {
         id: generateId(),
@@ -284,7 +274,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
       
       return {
         ...state,
-        currency: state.currency - BALANCE.baseMachineCost,
+        currency: state.currency - machineCost,
         machines: [...state.machines, newMachine],
         automation: {
           ...state.automation,
@@ -556,7 +546,7 @@ const gameReducer = (state: GameState, action: GameAction): GameState => {
         if (lockReasons.length > 0) return state;
 
         if (currentLevel >= catalogUpgrade.maxLevel) return state;
-        const cost = resolveCatalogUpgradeCost(action.upgradeId, currentLevel);
+        const cost = getUpgradePurchaseCost(action.upgradeId, currentLevel, state);
         if (cost === null || state.currency < cost) return state;
 
         return {

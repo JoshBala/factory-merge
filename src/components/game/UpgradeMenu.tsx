@@ -8,6 +8,7 @@ import {
   getUpgradeLockReasons,
 } from '@/config/upgrades';
 import { formatCurrency } from '@/utils/calculations';
+import { getUpgradePurchaseCost } from '@/utils/costs';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -37,16 +38,6 @@ const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
 
 const getTopLockReasons = (lockReasons: string[]): string[] => lockReasons.slice(0, 2);
 
-const getUpgradeCost = (upgrade: UpgradeDefinition, currentLevel: number) => {
-  if (currentLevel >= upgrade.maxLevel) return Number.POSITIVE_INFINITY;
-
-  if (upgrade.costGrowth.kind === 'exponential') {
-    return Math.round(upgrade.baseCost * Math.pow(upgrade.costGrowth.factor, currentLevel));
-  }
-
-  const levelFactor = Math.pow(currentLevel + 1, upgrade.costGrowth.power);
-  return Math.round(upgrade.baseCost + levelFactor * upgrade.baseCost * 0.22 * upgrade.costGrowth.scale);
-};
 
 const formatEffectAtLevel = (effect: UpgradeDefinition['effects'][number], level: number): string => {
   switch (effect.type) {
@@ -110,7 +101,7 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
         const nextLevel = Math.min(currentLevel + 1, upgrade.maxLevel);
         const lockReasons = getUpgradeLockReasons(upgrade, context);
         const canBuy = lockReasons.length === 0 && currentLevel < upgrade.maxLevel;
-        const cost = getUpgradeCost(upgrade, currentLevel);
+        const cost = getUpgradePurchaseCost(upgrade.id, currentLevel, state) ?? Number.POSITIVE_INFINITY;
         const revealed = index < ONBOARDING_VISIBLE_COUNT || currentLevel > 0 || lockReasons.length === 0;
 
         return {
@@ -131,9 +122,7 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
     categoryFilter,
     hideMaxUpgrades,
     ownedUpgrades,
-    state.machines.length,
-    state.stats.highestMachineLevel,
-    state.stats.lifetimeCurrencyEarned,
+    state,
     tierFilter,
   ]);
 
