@@ -12,6 +12,11 @@ import { migrateGameState } from '@/utils/migrations';
 import { createInitialState } from '@/utils/state';
 import { UPGRADE_BY_ID, getCompletedTier, getUpgradeLockReasons } from '@/config/upgrades';
 import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
+import {
+  createAddPresetAutomationRuleIntent,
+  createRemoveLatestAutomationRuleIntent,
+  createToggleAutomationIntent,
+} from '@/services/automationService';
 
 type UpgradeDefinition = {
   unlockRequirements?: Record<string, number> | Array<{ upgradeId: string; level: number }>;
@@ -743,6 +748,9 @@ interface GameContextType {
     moveMachine: (machineId: string, targetSlot: number) => void;
     scrapMachine: (machineId: string) => void;
     buyUpgrade: (upgradeId: string) => void;
+    toggleAutomation: (enabled?: boolean) => void;
+    addAutomationPresetRule: () => void;
+    removeLatestAutomationRule: () => void;
   };
 }
 
@@ -806,6 +814,20 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'SCRAP_MACHINE', machineId }), []),
     buyUpgrade: useCallback((upgradeId: string) =>
       dispatch({ type: 'BUY_UPGRADE', upgradeId }), []),
+    toggleAutomation: useCallback((enabled?: boolean) =>
+      dispatch(createToggleAutomationIntent(enabled)), []),
+    addAutomationPresetRule: useCallback(() => {
+      const stateSnapshot = state;
+      const toggleAction = createAddPresetAutomationRuleIntent(
+        'merge_any',
+        stateSnapshot.automation.rules.map(rule => rule.id)
+      );
+      dispatch(toggleAction);
+    }, [state]),
+    removeLatestAutomationRule: useCallback(() => {
+      const action = createRemoveLatestAutomationRuleIntent(state.automation.rules);
+      if (action) dispatch(action);
+    }, [state.automation.rules]),
   };
 
   return (
