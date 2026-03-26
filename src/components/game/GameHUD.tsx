@@ -15,6 +15,7 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import { BALANCE, getProductionRate } from '@/config/balance';
 import { GameMenuModal } from './GameMenuModal';
 import { getCompletedTier, getTierProgress } from '@/config/upgrades';
+import { selectAutomationSelectors } from '@/services/automationService';
 
 type DebugPurchase =
   | { key: string; label: string; cost: number; kind: 'machine'; slotIndex: number }
@@ -113,6 +114,7 @@ export const GameHUD = () => {
   const completedTiers = getCompletedTier(ownedUpgrades ?? {});
   const activeTier = tierProgress.find(tier => tier.percent < 100) ?? tierProgress[tierProgress.length - 1];
   const automationMetrics = state.automation.runtime.debugMetrics;
+  const automationSelectors = selectAutomationSelectors(state, effects.automationIntervalMs);
 
   // Update power outage countdown
   useEffect(() => {
@@ -259,6 +261,26 @@ export const GameHUD = () => {
           {import.meta.env.DEV && automationMetrics && (
             <div className="border-t border-border mt-2 pt-2">
               <div className="text-muted-foreground mb-1">Automation debug:</div>
+              <div className="flex justify-between">
+                <span>Can run:</span>
+                <span>{automationSelectors.canRun ? 'yes' : 'no'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Queue length:</span>
+                <span>{automationSelectors.queueLength}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Next run ETA:</span>
+                <span>
+                  {automationSelectors.nextRunEtaMs === null
+                    ? 'blocked'
+                    : `${(automationSelectors.nextRunEtaMs / 1000).toFixed(2)}s`}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>Last outcome:</span>
+                <span>{automationSelectors.lastOutcome}</span>
+              </div>
               <div className="flex justify-between">
                 <span>Ops (attempted/success):</span>
                 <span>{automationMetrics.attemptedOps}/{automationMetrics.successfulOps}</span>
