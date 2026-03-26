@@ -4,12 +4,11 @@ import {
   formatCurrency, 
   calculateProductionRate, 
   calculateBaseProductionRate,
-  getRowProductionBonus,
   getNextRarity,
   getRowUpgradeCost,
   resolveGameEffects,
 } from '@/utils/calculations';
-import { RowModule, Machine } from '@/types/game';
+import { Machine } from '@/types/game';
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { BALANCE, getProductionRate } from '@/config/balance';
@@ -22,7 +21,10 @@ type DebugPurchase =
   | { key: string; label: string; cost: number; kind: 'row_upgrade'; rowIndex: 0 | 1 | 2 };
 
 // Calculate per-row contribution
-const getRowContributions = (machines: Machine[], rowModules: RowModule[]) => {
+const getRowContributions = (
+  machines: Machine[],
+  effects: ReturnType<typeof resolveGameEffects>
+) => {
   const rowNames = ['Top', 'Mid', 'Bot'] as const;
   const rows = ([0, 1, 2] as const).map(rowIndex => {
     const start = rowIndex * BALANCE.gridColumns;
@@ -34,8 +36,12 @@ const getRowContributions = (machines: Machine[], rowModules: RowModule[]) => {
     const rowMachines = machines.filter(m => row.slots.includes(m.slotIndex) && !m.disabled);
     // Use procedural production rate
     const baseRate = rowMachines.reduce((sum, m) => sum + getProductionRate(m.level), 0);
-    const bonus = getRowProductionBonus(rowModules, row.index);
-    const modifiedRate = baseRate * (1 + bonus);
+    const bonus = effects.byRowPercent[row.index].productionPercent / 100;
+    const modifiedRate = rowMachines.reduce((sum, machine) => {
+      const rowBonusMultiplier = 1 + effects.byRowPercent[row.index].productionPercent / 100;
+      const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
+      return sum + getProductionRate(machine.level) * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
+    }, 0);
     return {
       name: row.name,
       baseRate,
@@ -62,8 +68,8 @@ export const GameHUD = () => {
   const isPowerOutage = state.activeDisaster?.type === 'powerOutage';
   const modifiedRate = calculateProductionRate(state.machines, isPowerOutage, state.rowModules, state);
   const baseRate = calculateBaseProductionRate(state.machines);
-  const rowContributions = getRowContributions(state.machines, state.rowModules);
   const effects = resolveGameEffects(state.rowModules, state);
+  const rowContributions = getRowContributions(state.machines, effects);
 
   const emptySlots = Array.from({ length: BALANCE.gridSize }, (_, index) => index)
     .filter(slotIndex => !state.machines.some(machine => machine.slotIndex === slotIndex));
@@ -173,7 +179,7 @@ export const GameHUD = () => {
           <div className="border-t border-border mt-2 pt-2">
             <div className="text-muted-foreground mb-1">Effective multipliers:</div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              <span>Production:</span>
+              <span>Production (global):</span>
               <span>x{effects.productionMultiplier.toFixed(3)}</span>
               <span>Post-merge:</span>
               <span>x{(1 + effects.byKindPercent.productionAfterMerge / 100).toFixed(3)}</span>

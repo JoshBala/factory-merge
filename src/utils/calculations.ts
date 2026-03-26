@@ -152,7 +152,9 @@ export const resolveGameEffects = (
     return acc;
   }, { ...EMPTY_ROW_BONUSES[0] });
 
-  const productionMultiplier = Math.max(0, 1 + byKindPercent.productionPercent / 100);
+  // Keep this multiplier global-only (upgrades/non-row effects).
+  // Row production bonuses are applied per-machine in production/offline formulas.
+  const productionMultiplier = Math.max(0, 1 + upgradePercents.productionPercent / 100);
   const mergedProductionMultiplier = Math.max(
     0,
     productionMultiplier * (1 + byKindPercent.productionAfterMerge / 100)
@@ -179,6 +181,20 @@ export const resolveGameEffects = (
     offlineEfficiency,
     machineCostMultiplier,
   };
+};
+
+const getMachineRateWithResolvedEffects = (
+  machine: Machine,
+  effects: ResolvedGameEffects
+): number => {
+  if (machine.disabled) return 0;
+
+  const baseRate = getProductionRate(machine.level);
+  const rowIndex = getRowForSlot(machine.slotIndex);
+  const rowBonusMultiplier = 1 + effects.byRowPercent[rowIndex].productionPercent / 100;
+  const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
+
+  return baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
 };
 
 /**
@@ -386,15 +402,7 @@ export const calculateProductionRate = (
 ): number => {
   if (isPowerOutage) return 0;
   const effects = resolveGameEffects(rowModules, state);
-  return machines.reduce((total, machine) => {
-    if (machine.disabled) return total;
-    // Use procedural production rate from balance config
-    const baseRate = getProductionRate(machine.level);
-    const rowIndex = getRowForSlot(machine.slotIndex);
-    const rowBonusMultiplier = 1 + effects.byRowPercent[rowIndex].productionPercent / 100;
-    const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
-    return total + baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
-  }, 0);
+  return machines.reduce((total, machine) => total + getMachineRateWithResolvedEffects(machine, effects), 0);
 };
 
 /**
@@ -430,19 +438,9 @@ export const calculateOfflineEarnings = (
   const maxOfflineMs = BALANCE.maxOfflineHours * 60 * 60 * 1000;
   const timeAway = Math.min(now - lastTickTime, maxOfflineMs);
   const effects = resolveGameEffects(rowModules, state);
-  
-  // Assume no disasters while offline, all machines functional
-  const activeMachines = machines.filter(m => !m.disabled);
-  const rate = activeMachines.reduce(
-    (total, m) => {
-      const baseRate = getProductionRate(m.level);
-      const rowIndex = getRowForSlot(m.slotIndex);
-      const rowBonusMultiplier = 1 + effects.byRowPercent[rowIndex].productionPercent / 100;
-      const mergeBonusMultiplier = m.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
-      return total + baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
-    },
-    0
-  );
+
+  // Assume no disasters while offline, all machines functional except disabled machines.
+  const rate = machines.reduce((total, machine) => total + getMachineRateWithResolvedEffects(machine, effects), 0);
   
   const earnings = (rate * timeAway * effects.offlineEfficiency) / 1000;
   return { earnings: Math.floor(earnings), timeAway };
