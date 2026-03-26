@@ -66,7 +66,28 @@ const migrateGridUpgrade = (
     };
   }
 
-  const fallback = rowModules[0];
+  // Legacy rowModules -> gridUpgrade policy (deterministic):
+  // - We treat legacy rows as parallel progression tracks.
+  // - We select a single winner instead of merging to avoid surprise power spikes.
+  // - Winner order is: highest rarity, then most unlocked bonuses, then earliest row index.
+  // This keeps migration stable and reproducible across imports/loads.
+  const rarityRank: Record<RowModule['rarity'], number> = {
+    common: 0,
+    uncommon: 1,
+    rare: 2,
+    epic: 3,
+  };
+  const fallback = [...rowModules].sort((a, b) => {
+    const byRarity = rarityRank[b.rarity] - rarityRank[a.rarity];
+    if (byRarity !== 0) return byRarity;
+
+    const unlockedA = a.bonuses.filter(bonus => !bonus.locked).length;
+    const unlockedB = b.bonuses.filter(bonus => !bonus.locked).length;
+    const byUnlocked = unlockedB - unlockedA;
+    if (byUnlocked !== 0) return byUnlocked;
+
+    return a.rowIndex - b.rowIndex;
+  })[0];
   return fallback ? { rarity: fallback.rarity, bonuses: fallback.bonuses } : null;
 };
 

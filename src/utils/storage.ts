@@ -3,6 +3,7 @@ import { SAVE_VERSION } from '@/config/version';
 import { GameState } from '@/types/game';
 import { migrateGameState } from '@/utils/migrations';
 import { sanitizeAutomationState } from '@/utils/automationValidation';
+import { normalizePersistedState } from '@/utils/state';
 
 const STORAGE_KEY = 'idle_merge_factory_save';
 
@@ -26,8 +27,9 @@ export const loadGame = (): GameState | null => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return null;
-    const parsed = JSON.parse(saved) as GameState;
-    return migrateGameState(parsed);
+    const parsed = JSON.parse(saved);
+    const normalized = normalizePersistedState(parsed);
+    return normalized ? migrateGameState(normalized) : null;
   } catch (e) {
     console.warn('Failed to load game:', e);
     return null;
