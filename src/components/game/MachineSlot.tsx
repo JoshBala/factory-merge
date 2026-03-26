@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useMachineDrag } from './DragContext';
 import { MachineTileContent } from './MachineTileContent';
 import { getLevelColor } from './machineTileUtils';
+import { FACTORY_LAYOUT } from './layoutConstants';
 
 interface MachineSlotProps {
   slotIndex: number;
@@ -80,7 +81,7 @@ export const MachineSlot = ({ slotIndex, machine }: MachineSlotProps) => {
           : undefined
       }
       className={cn(
-        'w-full aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all',
+        `${FACTORY_LAYOUT.machineSlotSizeClass} rounded-lg border-2 flex flex-col items-center justify-center transition-all`,
         'text-foreground font-medium select-none touch-manipulation',
         machine ? (
           machine.disabled 
@@ -103,7 +104,7 @@ export const MachineSlot = ({ slotIndex, machine }: MachineSlotProps) => {
       )}
     >
       {/* Fixed-height content area to prevent layout shifts */}
-      <div className="h-[52px] flex flex-col items-center justify-center">
+      <div className={`${FACTORY_LAYOUT.machineContentHeightClass} flex flex-col items-center justify-center`}>
         {machine ? (
           <MachineTileContent machine={machine} />
         ) : (
