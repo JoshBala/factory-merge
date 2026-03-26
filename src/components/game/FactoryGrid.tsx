@@ -1,14 +1,14 @@
-// === 3x3 Factory Grid with Row Module Panel ===
+// === 3x3 Factory Grid with persistent row upgrades panel ===
 import { useGame } from '@/contexts/GameContext';
 import { MachineSlot } from './MachineSlot';
-import { RowModulePanel } from './RowModulePanel';
+import { RowUpgradesPanel } from './RowUpgradesPanel';
 import { GAME_CONFIG } from '@/types/game';
 import { MachineDragProvider, useMachineDrag } from './DragContext';
 import { getLevelColor } from './machineTileUtils';
 import { MachineTileContent } from './MachineTileContent';
+import { Button } from '@/components/ui/button';
 
 interface FactoryGridProps {
-  onRowClick?: (rowIndex: 0 | 1 | 2) => void;
   onOpenUpgradeMenu?: () => void;
 }
 
@@ -47,7 +47,7 @@ const DragPreview = () => {
   );
 };
 
-const FactoryGridContent = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps) => {
+const FactoryGridContent = ({ onOpenUpgradeMenu }: FactoryGridProps) => {
   const { state } = useGame();
 
   // Create array of slots from shared grid capacity config.
@@ -58,30 +58,39 @@ const FactoryGridContent = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps)
 
   return (
     <div className="p-4 flex-1 flex items-center justify-center">
-      <div className="flex items-stretch gap-3">
-        {/* Row module panel - aligned with grid rows */}
-        {onRowClick && (
-          <RowModulePanel onRowClick={onRowClick} onOpenUpgradeMenu={onOpenUpgradeMenu} />
-        )}
-        
+      <div className="w-full max-w-7xl grid gap-4 lg:grid-cols-[minmax(300px,360px)_auto_minmax(220px,280px)] items-start">
+        <RowUpgradesPanel />
+
         {/* Fixed 3x3 grid (guarded in balance config). */}
-        <div className="grid grid-cols-3 gap-3 w-full max-w-xs">
+        <div className="grid grid-cols-3 gap-3 w-full max-w-xs justify-self-center">
           {slots.map(({ slotIndex, machine }) => (
-            <MachineSlot 
-              key={slotIndex} 
-              slotIndex={slotIndex} 
-              machine={machine} 
+            <MachineSlot
+              key={slotIndex}
+              slotIndex={slotIndex}
+              machine={machine}
             />
           ))}
         </div>
+
+        <aside className="w-full rounded-xl border border-border bg-card p-4 space-y-3">
+          <h2 className="text-base font-semibold text-foreground">Upgrades</h2>
+          <p className="text-sm text-muted-foreground">
+            Open the full upgrades menu to spend currency on factory-wide boosts.
+          </p>
+          {onOpenUpgradeMenu && (
+            <Button className="w-full" onClick={onOpenUpgradeMenu}>
+              Open Upgrades
+            </Button>
+          )}
+        </aside>
       </div>
       <DragPreview />
     </div>
   );
 };
 
-export const FactoryGrid = ({ onRowClick, onOpenUpgradeMenu }: FactoryGridProps) => (
+export const FactoryGrid = ({ onOpenUpgradeMenu }: FactoryGridProps) => (
   <MachineDragProvider>
-    <FactoryGridContent onRowClick={onRowClick} onOpenUpgradeMenu={onOpenUpgradeMenu} />
+    <FactoryGridContent onOpenUpgradeMenu={onOpenUpgradeMenu} />
   </MachineDragProvider>
 );
