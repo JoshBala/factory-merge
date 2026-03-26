@@ -143,7 +143,7 @@ export const resolveGameEffects = (
   gridUpgrade: GridModule | null = null,
   state?: UpgradeAwareState
 ): ResolvedGameEffects => {
-  const effectiveGridUpgrade = gridUpgrade ?? state?.gridUpgrade ?? state?.rowModules?.[0] ?? null;
+  const effectiveGridUpgrade = gridUpgrade ?? state?.gridUpgrade ?? null;
   const rowBonusPercents = resolveRowBonusPercents(effectiveGridUpgrade);
   const upgradePercents = resolveGlobalUpgradePercents(state);
   const byKindPercent = Object.keys(EMPTY_ROW_BONUSES[0]).reduce((acc, key) => {

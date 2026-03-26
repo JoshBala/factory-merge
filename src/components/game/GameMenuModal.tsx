@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { createSaveData, saveGame } from '@/utils/storage';
-import { createInitialState } from '@/utils/state';
+import { normalizePersistedState } from '@/utils/state';
 import { migrateGameState } from '@/utils/migrations';
 import { GameState } from '@/types/game';
 
@@ -21,35 +21,8 @@ const formatPlaytime = (ms: number): string => {
 };
 
 const normalizeImportedState = (data: unknown): GameState | null => {
-  if (!data || typeof data !== 'object') {
-    return null;
-  }
-
-  const base = createInitialState();
-  const partial = data as Partial<GameState>;
-
-  const normalized: GameState = {
-    ...base,
-    ...partial,
-    currency: typeof partial.currency === 'number' ? partial.currency : base.currency,
-    machines: Array.isArray(partial.machines) ? partial.machines : base.machines,
-    gridUpgrade: partial.gridUpgrade ?? base.gridUpgrade,
-    rowModules: Array.isArray(partial.rowModules) ? partial.rowModules : base.rowModules,
-    activeDisaster: partial.activeDisaster ?? base.activeDisaster,
-    selectedMachineId:
-      typeof partial.selectedMachineId === 'string' || partial.selectedMachineId === null
-        ? partial.selectedMachineId
-        : base.selectedMachineId,
-    lastTickTime: typeof partial.lastTickTime === 'number' ? partial.lastTickTime : base.lastTickTime,
-    totalPlayTime: typeof partial.totalPlayTime === 'number' ? partial.totalPlayTime : base.totalPlayTime,
-    stats: {
-      ...base.stats,
-      ...(partial.stats ?? {}),
-    },
-    saveVersion: typeof partial.saveVersion === 'number' ? partial.saveVersion : base.saveVersion,
-  };
-
-  return migrateGameState(normalized);
+  const normalized = normalizePersistedState(data);
+  return normalized ? migrateGameState(normalized) : null;
 };
 
 export const GameMenuModal = () => {
