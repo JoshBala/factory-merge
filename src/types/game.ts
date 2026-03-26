@@ -22,7 +22,7 @@ export interface Disaster {
   duration: number; // ms
 }
 
-// === ROW MODULE TYPES ===
+// === GRID UPGRADE TYPES ===
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic';
 
 export type BonusKind = 
@@ -42,10 +42,14 @@ export interface RowBonus {
   locked: boolean;
 }
 
-export interface RowModule {
-  rowIndex: 0 | 1 | 2; // top=0, mid=1, bottom=2
+export interface GridModule {
   rarity: Rarity;
   bonuses: RowBonus[];
+}
+
+// Legacy save compatibility only. Do not use rowIndex semantics in runtime logic.
+export interface RowModule extends GridModule {
+  rowIndex: 0 | 1 | 2;
 }
 
 export interface GameStats {
@@ -106,7 +110,9 @@ export interface GameState {
   selectedMachineId: string | null;
   lastTickTime: number;
   totalPlayTime: number;
-  rowModules: RowModule[]; // 0-3 modules, one per row
+  gridUpgrade: GridModule | null;
+  // Legacy save compatibility only. Runtime logic should use `gridUpgrade`.
+  rowModules: RowModule[];
   stats: GameStats;
   saveVersion?: number;
   ownedUpgrades: Record<string, number>;
@@ -220,6 +226,10 @@ export type GameAction =
   | { type: 'COLLECT_OFFLINE'; earnings: number }
   | { type: 'LOAD_GAME'; state: GameState }
   | { type: 'RESET_GAME' }
+  | { type: 'UPGRADE_GRID' }
+  | { type: 'REROLL_GRID_BONUSES' }
+  | { type: 'TOGGLE_GRID_BONUS_LOCK'; bonusIndex: number }
+  // Legacy action compatibility
   | { type: 'UPGRADE_ROW'; rowIndex: 0 | 1 | 2 }
   | { type: 'REROLL_ROW_BONUSES'; rowIndex: 0 | 1 | 2 }
   | { type: 'TOGGLE_ROW_BONUS_LOCK'; rowIndex: 0 | 1 | 2; bonusIndex: number }

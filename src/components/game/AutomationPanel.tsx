@@ -19,7 +19,7 @@ export const AutomationPanel = () => {
   const { state, actions } = useGame();
   const [open, setOpen] = useState(false);
 
-  const effects = resolveGameEffects(state.rowModules, state);
+  const effects = resolveGameEffects(state.gridUpgrade, state);
   const automationSummary = createAutomationRuleSummary(state);
   const presets = listAutomationPresets();
   const selectors = selectAutomationSelectors(state, effects.automationIntervalMs);

@@ -1,4 +1,4 @@
-import { BONUS_RANGES, BonusKind, GameState, RowBonus, RowModule } from '@/types/game';
+import { BONUS_RANGES, BonusKind, GameState, GridModule, RowBonus, RowModule } from '@/types/game';
 import { sanitizeAutomationState } from '@/utils/automationValidation';
 
 const migrateOwnedUpgrades = (ownedUpgrades: unknown): Record<string, number> => {
@@ -55,6 +55,21 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
     bonuses: module.bonuses.map(bonus => migrateRowBonus(bonus, module.rarity)),
   }));
 
+const migrateGridUpgrade = (
+  gridUpgrade: GridModule | null | undefined,
+  rowModules: RowModule[]
+): GridModule | null => {
+  if (gridUpgrade && Array.isArray(gridUpgrade.bonuses)) {
+    return {
+      ...gridUpgrade,
+      bonuses: gridUpgrade.bonuses.map(bonus => migrateRowBonus(bonus, gridUpgrade.rarity)),
+    };
+  }
+
+  const fallback = rowModules[0];
+  return fallback ? { rarity: fallback.rarity, bonuses: fallback.bonuses } : null;
+};
+
 const AUTOMATION_VALIDATION_ROLLOUT_VERSION = 2;
 
 const migrateAutomationState = (
@@ -69,7 +84,10 @@ const migrateAutomationState = (
   return sanitized;
 };
 
-export const migrateGameState = (state: Partial<GameState>): GameState => ({
+export const migrateGameState = (state: Partial<GameState>): GameState => {
+  const migratedRowModules = migrateRowModules(state.rowModules || []);
+
+  return {
   ...state,
   saveVersion: state.saveVersion ?? 0,
   stats: {
@@ -78,7 +96,9 @@ export const migrateGameState = (state: Partial<GameState>): GameState => ({
     lifetimeMerges: state.stats?.lifetimeMerges ?? 0,
     highestMachineLevel: state.stats?.highestMachineLevel ?? 0,
   },
-  rowModules: migrateRowModules(state.rowModules || []),
+  gridUpgrade: migrateGridUpgrade(state.gridUpgrade, migratedRowModules),
+  rowModules: migratedRowModules,
   ownedUpgrades: migrateOwnedUpgrades(state.ownedUpgrades),
   automation: migrateAutomationState(state.automation, state.saveVersion ?? 0),
-});
+};
+};

@@ -23,7 +23,7 @@ export const GameScreen = () => {
       const { earnings, timeAway } = calculateOfflineEarnings(
         saved.machines,
         saved.lastTickTime,
-        saved.rowModules ?? [],
+        saved.gridUpgrade ?? null,
         saved
       );
       // Show modal if away > 1 minute and earned something

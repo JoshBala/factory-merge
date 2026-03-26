@@ -1,7 +1,7 @@
 // === GAME CALCULATIONS ===
 import { 
   Machine, GAME_CONFIG, 
-  RowModule, Rarity, BonusKind, RowBonus, GameState,
+  RowModule, GridModule, Rarity, BonusKind, RowBonus, GameState,
   BONUS_RANGES, RARITY_BONUS_COUNT 
 } from '@/types/game';
 import { 
@@ -99,7 +99,7 @@ export const resolveAutomationIntervalMs = (
 };
 
 const resolveRowBonusPercents = (
-  rowModules: RowModule[]
+  gridUpgrade: GridModule | null
 ): Record<RowIndex, Record<BonusKind, number>> => {
   const totals: Record<RowIndex, Record<BonusKind, number>> = {
     0: { ...EMPTY_ROW_BONUSES[0] },
@@ -107,10 +107,13 @@ const resolveRowBonusPercents = (
     2: { ...EMPTY_ROW_BONUSES[2] },
   };
 
-  for (const module of rowModules) {
-    for (const bonus of module.bonuses) {
-      totals[module.rowIndex][bonus.kind] += calculateBonusValue(bonus);
-    }
+  if (!gridUpgrade) return totals;
+
+  for (const bonus of gridUpgrade.bonuses) {
+    const value = calculateBonusValue(bonus);
+    totals[0][bonus.kind] += value;
+    totals[1][bonus.kind] += value;
+    totals[2][bonus.kind] += value;
   }
 
   return totals;
@@ -137,18 +140,15 @@ const resolveGlobalUpgradePercents = (state?: UpgradeAwareState): Record<BonusKi
 };
 
 export const resolveGameEffects = (
-  rowModules: RowModule[] = [],
+  gridUpgrade: GridModule | null = null,
   state?: UpgradeAwareState
 ): ResolvedGameEffects => {
-  const rowBonusPercents = resolveRowBonusPercents(rowModules);
+  const effectiveGridUpgrade = gridUpgrade ?? state?.gridUpgrade ?? state?.rowModules?.[0] ?? null;
+  const rowBonusPercents = resolveRowBonusPercents(effectiveGridUpgrade);
   const upgradePercents = resolveGlobalUpgradePercents(state);
   const byKindPercent = Object.keys(EMPTY_ROW_BONUSES[0]).reduce((acc, key) => {
     const kind = key as BonusKind;
-    acc[kind] =
-      upgradePercents[kind] +
-      rowBonusPercents[0][kind] +
-      rowBonusPercents[1][kind] +
-      rowBonusPercents[2][kind];
+    acc[kind] = upgradePercents[kind] + rowBonusPercents[0][kind];
     return acc;
   }, { ...EMPTY_ROW_BONUSES[0] });
 
@@ -160,7 +160,7 @@ export const resolveGameEffects = (
     productionMultiplier * (1 + byKindPercent.productionAfterMerge / 100)
   );
   const automationIntervalMs = resolveAutomationIntervalMs(
-    rowBonusPercents[0].automationSpeed + rowBonusPercents[1].automationSpeed + rowBonusPercents[2].automationSpeed,
+    rowBonusPercents[0].automationSpeed,
     upgradePercents.automationSpeed
   );
   const disasterChance = Math.min(0.95, Math.max(0, GAME_CONFIG.disasterChance * (1 + byKindPercent.disasterChanceIncrease / 100)));
@@ -190,8 +190,7 @@ const getMachineRateWithResolvedEffects = (
   if (machine.disabled) return 0;
 
   const baseRate = getProductionRate(machine.level);
-  const rowIndex = getRowForSlot(machine.slotIndex);
-  const rowBonusMultiplier = 1 + effects.byRowPercent[rowIndex].productionPercent / 100;
+  const rowBonusMultiplier = 1 + effects.byKindPercent.productionPercent / 100;
   const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
 
   return baseRate * rowBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
@@ -204,7 +203,7 @@ const getMachineRateWithResolvedEffects = (
 export const getEffectiveAutomationInterval = (
   state: UpgradeAwareState
 ): number => {
-  return resolveGameEffects(state.rowModules ?? [], state).automationIntervalMs;
+  return resolveGameEffects(state.gridUpgrade ?? null, state).automationIntervalMs;
 };
 
 /**
@@ -214,7 +213,7 @@ export const getEffectiveAutomationInterval = (
 export const getEffectiveProductionMultiplier = (
   state: UpgradeAwareState
 ): number => {
-  return resolveGameEffects(state.rowModules ?? [], state).productionMultiplier;
+  return resolveGameEffects(state.gridUpgrade ?? null, state).productionMultiplier;
 };
 
 /**
@@ -245,7 +244,7 @@ export const getEffectiveBaseCellCreationRate = (
  * Formula: baseMachineCost * (1 - totalDiscount%)
  */
 export const getEffectiveMachineCost = (state: UpgradeAwareState): number => {
-  return BASE_MACHINE_COST * resolveGameEffects(state.rowModules ?? [], state).machineCostMultiplier;
+  return BASE_MACHINE_COST * resolveGameEffects(state.gridUpgrade ?? null, state).machineCostMultiplier;
 };
 
 // === ROW MODULE HELPERS ===
@@ -293,18 +292,16 @@ export const getNextRarity = (rarity: Rarity): Rarity | null => {
 };
 
 // Get upgrade cost for a row (to next rarity)
-export const getRowUpgradeCost = (rowModule: RowModule | undefined): number => {
-  if (!rowModule) {
+export const getGridUpgradeCost = (gridUpgrade: GridModule | null): number => {
+  if (!gridUpgrade) {
     return GAME_CONFIG.rowModuleCosts.common;
   }
-  const nextRarity = getNextRarity(rowModule.rarity);
+  const nextRarity = getNextRarity(gridUpgrade.rarity);
   return nextRarity ? GAME_CONFIG.rowModuleCosts[nextRarity] : 0;
 };
 
 // Get reroll cost for a row
-export const getRerollCost = (rowIndex: 0 | 1 | 2): number => {
-  return GAME_CONFIG.rerollBaseCost * (rowIndex + 1);
-};
+export const getRerollCost = (): number => GAME_CONFIG.rerollBaseCost;
 
 // Generate a random bonus (avoids existing types)
 const getRandomBonusKind = (): BonusKind =>
@@ -330,14 +327,13 @@ export const generateRandomBonus = (rarity: Rarity): RowBonus => {
 };
 
 // Create initial row module (common with 1 bonus)
-export const createRowModule = (rowIndex: 0 | 1 | 2): RowModule => ({
-  rowIndex,
+export const createGridModule = (): GridModule => ({
   rarity: 'common',
   bonuses: [generateRandomBonus('common')],
 });
 
 // Upgrade row module to next rarity (keeps bonuses, adds new ones)
-export const upgradeRowModule = (module: RowModule): RowModule | null => {
+export const upgradeGridModule = (module: GridModule): GridModule | null => {
   const nextRarity = getNextRarity(module.rarity);
   if (!nextRarity) return null;
   
@@ -361,7 +357,7 @@ export const upgradeRowModule = (module: RowModule): RowModule | null => {
 };
 
 // Reroll a specific bonus (keeps same type, new roll)
-export const rerollRowBonuses = (module: RowModule): RowModule => ({
+export const rerollGridBonuses = (module: GridModule): GridModule => ({
   ...module,
   bonuses: module.bonuses.map(bonus =>
     bonus.locked ? bonus : generateRandomBonus(module.rarity)
@@ -370,24 +366,36 @@ export const rerollRowBonuses = (module: RowModule): RowModule => ({
 
 // Calculate total production bonus for machines in a specific row
 export const getRowProductionBonus = (
-  rowModules: RowModule[],
-  rowIndex: number
+  gridUpgrade: GridModule | null
 ): number => {
-  const row = Math.max(0, Math.min(2, rowIndex)) as RowIndex;
-  const effects = resolveGameEffects(rowModules);
-  return effects.byRowPercent[row].productionPercent / 100; // Convert percentage to multiplier
+  const effects = resolveGameEffects(gridUpgrade);
+  return effects.byKindPercent.productionPercent / 100;
 };
 
 // Calculate disaster duration reduction for a specific row
 export const getDisasterDurationReduction = (
-  rowModules: RowModule[],
-  rowIndex: number
+  gridUpgrade: GridModule | null
 ): number => {
-  const row = Math.max(0, Math.min(2, rowIndex)) as RowIndex;
-  const effects = resolveGameEffects(rowModules);
-  return effects.byRowPercent[row].disasterDurationReduction / 100; // Convert percentage to multiplier
+  const effects = resolveGameEffects(gridUpgrade);
+  return effects.byKindPercent.disasterDurationReduction / 100;
 };
 
+
+// Legacy wrappers for compatibility
+export const getRowUpgradeCost = (rowModule: RowModule | undefined): number =>
+  getGridUpgradeCost(rowModule ?? null);
+export const createRowModule = (rowIndex: 0 | 1 | 2): RowModule => ({
+  rowIndex,
+  ...createGridModule(),
+});
+export const upgradeRowModule = (module: RowModule): RowModule | null => {
+  const upgraded = upgradeGridModule(module);
+  return upgraded ? { ...upgraded, rowIndex: module.rowIndex } : null;
+};
+export const rerollRowBonuses = (module: RowModule): RowModule => ({
+  ...rerollGridBonuses(module),
+  rowIndex: module.rowIndex,
+});
 // === PRODUCTION CALCULATIONS ===
 
 /**
@@ -397,11 +405,11 @@ export const getDisasterDurationReduction = (
 export const calculateProductionRate = (
   machines: Machine[],
   isPowerOutage: boolean,
-  rowModules: RowModule[] = [],
+  gridUpgrade: GridModule | null = null,
   state?: UpgradeAwareState
 ): number => {
   if (isPowerOutage) return 0;
-  const effects = resolveGameEffects(rowModules, state);
+  const effects = resolveGameEffects(gridUpgrade, state);
   return machines.reduce((total, machine) => total + getMachineRateWithResolvedEffects(machine, effects), 0);
 };
 
@@ -420,10 +428,10 @@ export const calculateEarnings = (
   machines: Machine[],
   isPowerOutage: boolean,
   deltaMs: number,
-  rowModules: RowModule[] = [],
+  gridUpgrade: GridModule | null = null,
   state?: UpgradeAwareState
 ): number => {
-  const rate = calculateProductionRate(machines, isPowerOutage, rowModules, state);
+  const rate = calculateProductionRate(machines, isPowerOutage, gridUpgrade, state);
   return (rate * deltaMs) / 1000; // Convert ms to seconds
 };
 
@@ -431,13 +439,13 @@ export const calculateEarnings = (
 export const calculateOfflineEarnings = (
   machines: Machine[],
   lastTickTime: number,
-  rowModules: RowModule[] = [],
+  gridUpgrade: GridModule | null = null,
   state?: UpgradeAwareState
 ): { earnings: number; timeAway: number } => {
   const now = Date.now();
   const maxOfflineMs = BALANCE.maxOfflineHours * 60 * 60 * 1000;
   const timeAway = Math.min(now - lastTickTime, maxOfflineMs);
-  const effects = resolveGameEffects(rowModules, state);
+  const effects = resolveGameEffects(gridUpgrade, state);
 
   // Assume no disasters while offline, all machines functional except disabled machines.
   const rate = machines.reduce((total, machine) => total + getMachineRateWithResolvedEffects(machine, effects), 0);

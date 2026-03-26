@@ -1,7 +1,7 @@
 // === GAME LOOP HOOK ===
 // Handles production ticks, disaster generation, and automation scheduling
 import { useEffect, useRef } from 'react';
-import { GameState, GameAction, Disaster, GAME_CONFIG, RowModule } from '@/types/game';
+import { GameState, GameAction, Disaster, GAME_CONFIG, GridModule } from '@/types/game';
 import { randomInRange, resolveGameEffects } from '@/utils/calculations';
 import { planAutomationOps } from '@/utils/automationPlanner';
 import { resolveUpgradeEffects } from '@/utils/upgradeEffects';
@@ -92,9 +92,9 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
         // Only trigger if no active disaster and player has machines
         const currentState = stateRef.current;
         if (!currentState.activeDisaster && currentState.machines.length > 0) {
-          const effects = resolveGameEffects(currentState.rowModules, currentState);
+          const effects = resolveGameEffects(currentState.gridUpgrade, currentState);
           if (Math.random() < effects.disasterChance) {
-            const disaster = generateDisaster(currentState, currentState.rowModules);
+            const disaster = generateDisaster(currentState, currentState.gridUpgrade);
             if (disaster) {
               dispatch({ type: 'START_DISASTER', disaster });
             }
@@ -113,7 +113,7 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
       const currentState = stateRef.current;
       if (currentState.automation.enabled && !isAutomationBlockedByDisaster(currentState)) {
         // Resolve row + upgrade effects exactly once per scheduling cycle
-        const rowEffects = resolveGameEffects(currentState.rowModules, currentState);
+        const rowEffects = resolveGameEffects(currentState.gridUpgrade, currentState);
         const automationIntervalMs = rowEffects.automationIntervalMs;
         const fullBudget = Math.max(1, Math.floor(currentState.automation.runtime.opsPerTickBudget || 1));
         let remainingBudget = fullBudget;
@@ -184,14 +184,14 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
 };
 
 // Calculate global disaster duration reduction from all row modules
-const getGlobalDisasterReduction = (rowModules: RowModule[]): number => {
-  const effects = resolveGameEffects(rowModules);
+const getGlobalDisasterReduction = (gridUpgrade: GridModule | null): number => {
+  const effects = resolveGameEffects(gridUpgrade);
   // Cap at 80% reduction to keep some challenge
   return Math.min(0.8, 1 - effects.disasterDurationMultiplier);
 };
 
 // Generate a random disaster
-const generateDisaster = (state: GameState, rowModules: RowModule[]): Disaster | null => {
+const generateDisaster = (state: GameState, gridUpgrade: GridModule | null): Disaster | null => {
   const disasterType = Math.random() < 0.5 ? 'fire' : 'powerOutage';
 
   if (disasterType === 'fire') {
@@ -214,7 +214,7 @@ const generateDisaster = (state: GameState, rowModules: RowModule[]): Disaster |
       GAME_CONFIG.powerOutageDuration.min,
       GAME_CONFIG.powerOutageDuration.max
     );
-    const reduction = getGlobalDisasterReduction(rowModules);
+    const reduction = getGlobalDisasterReduction(gridUpgrade);
     const finalDuration = Math.max(baseDuration * (1 - reduction), 2000); // Min 2s
 
     return {

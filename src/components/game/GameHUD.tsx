@@ -5,7 +5,7 @@ import {
   calculateProductionRate, 
   calculateBaseProductionRate,
   getNextRarity,
-  getRowUpgradeCost,
+  getGridUpgradeCost,
   resolveGameEffects,
 } from '@/utils/calculations';
 import { Machine } from '@/types/game';
@@ -19,7 +19,7 @@ import { selectAutomationSelectors } from '@/services/automationService';
 
 type DebugPurchase =
   | { key: string; label: string; cost: number; kind: 'machine'; slotIndex: number }
-  | { key: string; label: string; cost: number; kind: 'row_upgrade'; rowIndex: 0 | 1 | 2 };
+  | { key: string; label: string; cost: number; kind: 'grid_upgrade' };
 
 // Calculate per-row contribution
 const getRowContributions = (
@@ -67,9 +67,9 @@ export const GameHUD = () => {
 
   // Calculate rates using unified function
   const isPowerOutage = state.activeDisaster?.type === 'powerOutage';
-  const modifiedRate = calculateProductionRate(state.machines, isPowerOutage, state.rowModules, state);
+  const modifiedRate = calculateProductionRate(state.machines, isPowerOutage, state.gridUpgrade, state);
   const baseRate = calculateBaseProductionRate(state.machines);
-  const effects = resolveGameEffects(state.rowModules, state);
+  const effects = resolveGameEffects(state.gridUpgrade, state);
   const rowContributions = getRowContributions(state.machines, effects);
 
   const emptySlots = Array.from({ length: BALANCE.gridSize }, (_, index) => index)
@@ -85,18 +85,17 @@ export const GameHUD = () => {
           slotIndex: emptySlots[0],
         }]
       : []),
-    ...([0, 1, 2] as const).flatMap(rowIndex => {
-      const module = state.rowModules.find(m => m.rowIndex === rowIndex);
+    ...(() => {
+      const module = state.gridUpgrade;
       const nextRarity = module ? getNextRarity(module.rarity) : 'common';
       if (module && !nextRarity) return [];
       return [{
-        key: `row-${rowIndex}`,
-        label: module ? `Upgrade ${['Top', 'Mid', 'Bot'][rowIndex]} row` : `Unlock ${['Top', 'Mid', 'Bot'][rowIndex]} row`,
-        cost: getRowUpgradeCost(module),
-        kind: 'row_upgrade' as const,
-        rowIndex,
+        key: 'grid-upgrade',
+        label: module ? 'Upgrade grid module' : 'Unlock grid module',
+        cost: getGridUpgradeCost(module),
+        kind: 'grid_upgrade' as const,
       }];
-    }),
+    })(),
   ];
 
   const selectedPurchase = purchaseOptions.find(option => option.key === selectedPurchaseKey) ?? purchaseOptions[0];
@@ -111,7 +110,7 @@ export const GameHUD = () => {
       ? calculateProductionRate(
         [...state.machines, { id: 'debug-machine', level: 1, slotIndex: selectedPurchase.slotIndex, disabled: false }],
         isPowerOutage,
-        state.rowModules,
+        state.gridUpgrade,
         state
       )
     : null;
