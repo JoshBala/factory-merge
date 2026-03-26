@@ -18,6 +18,7 @@ export const MachineSlot = ({ slotIndex, machine }: MachineSlotProps) => {
   const { dragState, startDrag, ignoreClick, clearIgnoreClick } = useMachineDrag();
   const canAfford = state.currency >= BALANCE.baseMachineCost;
   const isSelected = machine && state.selectedMachineId === machine.id;
+  const canStartDrag = !!machine && !machine.disabled;
   
   // Check if this slot can be merge target
   const selectedMachine = state.machines.find(m => m.id === state.selectedMachineId);
@@ -74,13 +75,13 @@ export const MachineSlot = ({ slotIndex, machine }: MachineSlotProps) => {
       data-slot-index={slotIndex}
       onClick={handleClick}
       onPointerDown={
-        machine
-          ? event => startDrag(machine.id, slotIndex, event)
+        canStartDrag
+          ? event => startDrag(machine!.id, slotIndex, event)
           : undefined
       }
       className={cn(
         'w-full aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all',
-        'text-foreground font-medium',
+        'text-foreground font-medium select-none touch-manipulation',
         machine ? (
           machine.disabled 
             ? 'bg-destructive/10 border-destructive' 
@@ -94,7 +95,7 @@ export const MachineSlot = ({ slotIndex, machine }: MachineSlotProps) => {
         ),
         isSelected && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
         canMergeHere && 'ring-2 ring-green-500 ring-offset-2 ring-offset-background animate-pulse',
-        machine && 'touch-none select-none cursor-grab active:cursor-grabbing',
+        canStartDrag && 'cursor-grab active:cursor-grabbing',
         isDragOrigin && 'opacity-60 scale-95',
         dragMoveTarget && 'ring-2 ring-primary/70 ring-offset-2 ring-offset-background',
         dragMergeTarget && 'ring-2 ring-green-500 ring-offset-2 ring-offset-background',

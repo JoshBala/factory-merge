@@ -130,6 +130,7 @@ export const MachineDragProvider = ({ children }: { children: React.ReactNode })
       const currentState = stateRef.current;
       const currentActions = actionsRef.current;
       const wasDragging = currentDrag.isDragging;
+      let didCompleteDrag = false;
 
       if (wasDragging && currentDrag.draggedMachineId) {
         const draggedMachine = currentState.machines.find(
@@ -143,14 +144,16 @@ export const MachineDragProvider = ({ children }: { children: React.ReactNode })
             );
             if (!targetMachine && !draggedMachine.disabled) {
               currentActions.moveMachine(draggedMachine.id, targetSlot);
+              didCompleteDrag = true;
             } else if (targetMachine && canMerge(draggedMachine, targetMachine)) {
               currentActions.mergeMachines(draggedMachine.id, targetMachine.id);
+              didCompleteDrag = true;
             }
           }
         }
       }
 
-      if (wasDragging) {
+      if (didCompleteDrag) {
         setIgnoreClick(true);
       }
 

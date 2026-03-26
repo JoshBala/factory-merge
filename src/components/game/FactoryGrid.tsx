@@ -58,7 +58,7 @@ const FactoryGridContent = () => {
         <RowUpgradesPanel />
 
         {/* Fixed 3x3 grid (guarded in balance config). */}
-        <div className="grid grid-cols-3 gap-3 w-full max-w-xs justify-self-center">
+        <div className="grid grid-cols-3 gap-3 w-full max-w-xs justify-self-center select-none touch-manipulation">
           {slots.map(({ slotIndex, machine }) => (
             <MachineSlot
               key={slotIndex}
