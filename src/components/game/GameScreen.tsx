@@ -6,7 +6,6 @@ import { GameHUD } from './GameHUD';
 import { FactoryGrid } from './FactoryGrid';
 import { ActionBar } from './ActionBar';
 import { OfflineModal } from './OfflineModal';
-import { RowUpgradesModal } from './RowUpgradesModal';
 import { UpgradeMenu } from './UpgradeMenu';
 import { calculateOfflineEarnings } from '@/utils/calculations';
 import { loadGame } from '@/utils/storage';
@@ -14,16 +13,8 @@ import { loadGame } from '@/utils/storage';
 export const GameScreen = () => {
   const { state, dispatch } = useGame();
   const [offlineEarnings, setOfflineEarnings] = useState<number | null>(null);
-  const [showRowUpgrades, setShowRowUpgrades] = useState(false);
-  const [focusedRow, setFocusedRow] = useState<0 | 1 | 2 | null>(null);
   const [showUpgradeMenu, setShowUpgradeMenu] = useState(false);
 
-  // Handle row panel click - open modal
-  const handleRowClick = (rowIndex: 0 | 1 | 2) => {
-    setFocusedRow(rowIndex);
-    setShowRowUpgrades(true);
-  };
-  
   // Start the game loop
   useGameLoop({ state, dispatch });
 
@@ -54,27 +45,17 @@ export const GameScreen = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <GameHUD />
-      
-      <FactoryGrid onRowClick={handleRowClick} onOpenUpgradeMenu={() => setShowUpgradeMenu(true)} />
+
+      <FactoryGrid onOpenUpgradeMenu={() => setShowUpgradeMenu(true)} />
       <ActionBar />
-      
+
       {/* Offline earnings modal */}
       {offlineEarnings !== null && (
-        <OfflineModal 
-          earnings={offlineEarnings} 
-          onCollect={handleCollectOffline} 
+        <OfflineModal
+          earnings={offlineEarnings}
+          onCollect={handleCollectOffline}
         />
       )}
-
-      {/* Row upgrades modal */}
-      <RowUpgradesModal 
-        isOpen={showRowUpgrades}
-        onClose={() => {
-          setShowRowUpgrades(false);
-          setFocusedRow(null);
-        }}
-        initialRow={focusedRow}
-      />
 
       <UpgradeMenu
         isOpen={showUpgradeMenu}
