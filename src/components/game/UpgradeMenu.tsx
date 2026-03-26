@@ -24,6 +24,7 @@ interface UpgradeMenuProps {
 }
 
 const ONBOARDING_VISIBLE_COUNT = 8;
+const VISIBLE_EFFECT_COUNT = 3;
 
 const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
   automation: 'Automation',
@@ -246,6 +247,8 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
                   const isLocked = !atMax && lockReasons.length > 0;
                   const canBuyNow = !atMax && canBuy && isAffordable;
                   const topLockReasons = getTopLockReasons(lockReasons);
+                  const visibleEffects = upgrade.effects.slice(0, VISIBLE_EFFECT_COUNT);
+                  const hiddenEffects = upgrade.effects.slice(VISIBLE_EFFECT_COUNT);
                   const statusLabel = atMax
                     ? 'Maxed'
                     : isLocked
@@ -275,20 +278,47 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
                       </div>
 
                       <p className="text-xs text-muted-foreground">{upgrade.description}</p>
-                      <p className="text-xs">
-                        {atMax ? (
-                          <>
-                            <span className="text-muted-foreground">Current effect:</span>{' '}
-                            {formatEffectAtLevel(upgrade.effects[0], currentLevel)}
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-muted-foreground">Effect:</span>{' '}
-                            {formatEffectAtLevel(upgrade.effects[0], currentLevel)} →{' '}
-                            {formatEffectAtLevel(upgrade.effects[0], nextLevel)}
-                          </>
+                      <div className="space-y-1">
+                        {visibleEffects.map((effect, effectIndex) => (
+                          <p key={`${upgrade.id}-effect-${effect.type}-${effectIndex}`} className="text-xs">
+                            {atMax ? (
+                              <>
+                                <span className="text-muted-foreground">Current effect:</span>{' '}
+                                {formatEffectAtLevel(effect, currentLevel)}
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-muted-foreground">Effect:</span>{' '}
+                                {formatEffectAtLevel(effect, currentLevel)} →{' '}
+                                {formatEffectAtLevel(effect, nextLevel)}
+                              </>
+                            )}
+                          </p>
+                        ))}
+                        {hiddenEffects.length > 0 && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="text-xs text-muted-foreground underline underline-offset-2"
+                              >
+                                +{hiddenEffects.length} more effects
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="space-y-1 max-w-xs">
+                                {hiddenEffects.map((effect, effectIndex) => (
+                                  <p key={`${upgrade.id}-hidden-effect-${effect.type}-${effectIndex}`} className="text-xs">
+                                    {atMax
+                                      ? formatEffectAtLevel(effect, currentLevel)
+                                      : `${formatEffectAtLevel(effect, currentLevel)} → ${formatEffectAtLevel(effect, nextLevel)}`}
+                                  </p>
+                                ))}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
                         )}
-                      </p>
+                      </div>
 
                       <div className="text-xs text-muted-foreground">Cost: {atMax ? 'MAX' : formatCurrency(cost)}</div>
 
