@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { BALANCE, getProductionRate } from '@/config/balance';
 import { GameMenuModal } from './GameMenuModal';
+import { AutomationPanel } from './AutomationPanel';
 import { getCompletedTier, getTierProgress } from '@/config/upgrades';
 import { selectAutomationSelectors } from '@/services/automationService';
 
@@ -140,7 +141,8 @@ export const GameHUD = () => {
 
   return (
     <header className="bg-card border-b border-border p-4">
-      <div className="flex justify-end mb-2">
+      <div className="mb-2 flex items-start justify-between gap-3">
+        <AutomationPanel />
         <GameMenuModal />
       </div>
       {/* Currency display */}
