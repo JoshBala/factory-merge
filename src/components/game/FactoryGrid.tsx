@@ -7,6 +7,7 @@ import { MachineDragProvider, useMachineDrag } from './DragContext';
 import { getLevelColor } from './machineTileUtils';
 import { MachineTileContent } from './MachineTileContent';
 import { UpgradesPanel } from './UpgradeMenu';
+import { FACTORY_LAYOUT } from './layoutConstants';
 
 const DragPreview = () => {
   const { state } = useGame();
@@ -35,7 +36,7 @@ const DragPreview = () => {
           draggedMachine.disabled ? 'bg-destructive/10 border-destructive' : getLevelColor(draggedMachine.level)
         } opacity-90 scale-105`}
       >
-        <div className="h-[52px] flex flex-col items-center justify-center">
+        <div className={`${FACTORY_LAYOUT.machineContentHeightClass} flex flex-col items-center justify-center`}>
           <MachineTileContent machine={draggedMachine} />
         </div>
       </div>
@@ -58,7 +59,9 @@ const FactoryGridContent = () => {
         <RowUpgradesPanel />
 
         {/* Fixed 3x3 grid (guarded in balance config). */}
-        <div className="grid grid-cols-3 gap-3 w-full max-w-xs justify-self-center select-none touch-manipulation">
+        <div
+          className={`grid w-full justify-self-center select-none touch-manipulation ${FACTORY_LAYOUT.gridColumnsClass} ${FACTORY_LAYOUT.gridGapClass} ${FACTORY_LAYOUT.gridMaxWidthClass}`}
+        >
           {slots.map(({ slotIndex, machine }) => (
             <MachineSlot
               key={slotIndex}
