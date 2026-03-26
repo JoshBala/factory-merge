@@ -21,6 +21,32 @@ export interface AutomationSelectors {
   lastOutcome: AutomationLastOutcome;
 }
 
+export type AutomationPresetId = 'merge_any' | 'fill_empty_slots';
+
+interface AutomationPresetDefinition {
+  id: AutomationPresetId;
+  label: string;
+  triggerType: AutomationRule['triggerType'];
+}
+
+const AUTOMATION_PRESET_DEFINITIONS: Record<AutomationPresetId, AutomationPresetDefinition> = {
+  merge_any: {
+    id: 'merge_any',
+    label: 'Merge any available pair',
+    triggerType: 'merge_available',
+  },
+  fill_empty_slots: {
+    id: 'fill_empty_slots',
+    label: 'Move to fill empty slots',
+    triggerType: 'slot_filled',
+  },
+};
+
+export interface AutomationRuleSummary {
+  total: number;
+  enabled: number;
+}
+
 export const createAutomationRulePayload = (input: CreateAutomationRuleInput): AutomationRule => ({
   id: input.id,
   enabled: input.enabled ?? true,
@@ -56,6 +82,40 @@ export const createToggleAutomationIntent = (enabled?: boolean): GameAction => (
   type: 'TOGGLE_AUTOMATION',
   enabled,
 });
+
+export const createAutomationRuleSummary = (state: GameState): AutomationRuleSummary => {
+  const total = state.automation.rules.length;
+  const enabled = state.automation.rules.filter((rule) => rule.enabled).length;
+  return { total, enabled };
+};
+
+export const createAddPresetAutomationRuleIntent = (
+  presetId: AutomationPresetId,
+  existingRuleIds: string[]
+): GameAction => {
+  const preset = AUTOMATION_PRESET_DEFINITIONS[presetId];
+  const id = `${presetId}-${existingRuleIds.length + 1}-${Date.now()}`;
+
+  return createAddAutomationRuleIntent(
+    createAutomationRulePayload({
+      id,
+      triggerType: preset.triggerType,
+      enabled: true,
+      cooldownMs: 0,
+    })
+  );
+};
+
+export const createRemoveLatestAutomationRuleIntent = (
+  rules: AutomationRule[]
+): GameAction | null => {
+  if (rules.length === 0) return null;
+  const latestRule = rules[rules.length - 1];
+  return createRemoveAutomationRuleIntent(latestRule.id);
+};
+
+export const listAutomationPresets = (): AutomationPresetDefinition[] =>
+  Object.values(AUTOMATION_PRESET_DEFINITIONS);
 
 const summarizeOutcome = (state: GameState): AutomationLastOutcome => {
   const metrics = state.automation.runtime.debugMetrics;
