@@ -6,11 +6,7 @@ import { GAME_CONFIG } from '@/types/game';
 import { MachineDragProvider, useMachineDrag } from './DragContext';
 import { getLevelColor } from './machineTileUtils';
 import { MachineTileContent } from './MachineTileContent';
-import { Button } from '@/components/ui/button';
-
-interface FactoryGridProps {
-  onOpenUpgradeMenu?: () => void;
-}
+import { UpgradesPanel } from './UpgradeMenu';
 
 const DragPreview = () => {
   const { state } = useGame();
@@ -47,7 +43,7 @@ const DragPreview = () => {
   );
 };
 
-const FactoryGridContent = ({ onOpenUpgradeMenu }: FactoryGridProps) => {
+const FactoryGridContent = () => {
   const { state } = useGame();
 
   // Create array of slots from shared grid capacity config.
@@ -58,7 +54,7 @@ const FactoryGridContent = ({ onOpenUpgradeMenu }: FactoryGridProps) => {
 
   return (
     <div className="p-4 flex-1 flex items-center justify-center">
-      <div className="w-full max-w-7xl grid gap-4 lg:grid-cols-[minmax(300px,360px)_auto_minmax(220px,280px)] items-start">
+      <div className="w-full max-w-[1400px] grid gap-4 lg:grid-cols-[minmax(300px,360px)_auto_minmax(360px,400px)] items-start">
         <RowUpgradesPanel />
 
         {/* Fixed 3x3 grid (guarded in balance config). */}
@@ -72,25 +68,15 @@ const FactoryGridContent = ({ onOpenUpgradeMenu }: FactoryGridProps) => {
           ))}
         </div>
 
-        <aside className="w-full rounded-xl border border-border bg-card p-4 space-y-3">
-          <h2 className="text-base font-semibold text-foreground">Upgrades</h2>
-          <p className="text-sm text-muted-foreground">
-            Open the full upgrades menu to spend currency on factory-wide boosts.
-          </p>
-          {onOpenUpgradeMenu && (
-            <Button className="w-full" onClick={onOpenUpgradeMenu}>
-              Open Upgrades
-            </Button>
-          )}
-        </aside>
+        <UpgradesPanel />
       </div>
       <DragPreview />
     </div>
   );
 };
 
-export const FactoryGrid = ({ onOpenUpgradeMenu }: FactoryGridProps) => (
+export const FactoryGrid = () => (
   <MachineDragProvider>
-    <FactoryGridContent onOpenUpgradeMenu={onOpenUpgradeMenu} />
+    <FactoryGridContent />
   </MachineDragProvider>
 );

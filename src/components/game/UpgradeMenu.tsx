@@ -16,12 +16,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { X } from 'lucide-react';
-
-interface UpgradeMenuProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
 
 const ONBOARDING_VISIBLE_COUNT = 8;
 const VISIBLE_EFFECT_COUNT = 3;
@@ -38,7 +32,6 @@ const CATEGORY_LABELS: Record<UpgradeCategory, string> = {
 };
 
 const getTopLockReasons = (lockReasons: string[]): string[] => lockReasons.slice(0, 2);
-
 
 const formatEffectAtLevel = (effect: UpgradeDefinition['effects'][number], level: number): string => {
   switch (effect.type) {
@@ -76,7 +69,7 @@ const getScalingText = (upgrade: UpgradeDefinition): string => {
   return `Cost scales polynomially (power ${upgrade.costGrowth.power.toFixed(2)}, scale ${upgrade.costGrowth.scale.toFixed(2)}).`;
 };
 
-export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
+export const UpgradesPanel = () => {
   const { state, actions } = useGame();
   const [categoryFilter, setCategoryFilter] = useState<UpgradeCategory | 'all'>('all');
   const [tierFilter, setTierFilter] = useState<number | 'all'>('all');
@@ -131,248 +124,234 @@ export const UpgradeMenu = ({ isOpen, onClose }: UpgradeMenuProps) => {
 
   const tierOptions = Array.from(new Set(UPGRADE_DEFINITIONS.map(upgrade => upgrade.tier)));
 
-  if (!isOpen) return null;
-
   return (
     <TooltipProvider>
-      <div className="fixed inset-0 z-[65] flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <section className="w-full lg:w-[360px] xl:w-[400px] rounded-xl border border-border bg-background overflow-hidden shadow-lg flex h-[calc(100vh-9rem)] max-h-[860px] min-h-[560px]">
+        <aside className="w-44 border-r border-border p-3 space-y-4 bg-card/30 overflow-y-auto">
+          <div>
+            <h2 className="text-base font-bold text-foreground">Upgrades</h2>
+            <p className="text-xs text-muted-foreground mt-1">Filter by category or tier.</p>
+          </div>
 
-        <div className="relative bg-background border border-border rounded-xl w-full max-w-6xl max-h-[92vh] overflow-hidden shadow-2xl flex">
-          <aside className="w-60 border-r border-border p-4 space-y-4 bg-card/30 overflow-y-auto">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Upgrade Menu</h2>
-              <p className="text-xs text-muted-foreground mt-1">Filter by category or tier.</p>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase text-muted-foreground mb-2">Categories</p>
-              <div className="space-y-1">
-                <Button
-                  variant={categoryFilter === 'all' ? 'default' : 'ghost'}
-                  className="w-full justify-start"
-                  size="sm"
-                  onClick={() => setCategoryFilter('all')}
-                >
-                  All categories
-                </Button>
-                {(Object.keys(CATEGORY_LABELS) as UpgradeCategory[]).map(category => (
-                  <Button
-                    key={category}
-                    variant={categoryFilter === category ? 'default' : 'ghost'}
-                    className="w-full justify-start"
-                    size="sm"
-                    onClick={() => setCategoryFilter(category)}
-                  >
-                    {CATEGORY_LABELS[category]}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase text-muted-foreground mb-2">Tier</p>
-              <div className="grid grid-cols-3 gap-1">
-                <Button
-                  variant={tierFilter === 'all' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setTierFilter('all')}
-                  className="col-span-3"
-                >
-                  All
-                </Button>
-                {tierOptions.map(tier => (
-                  <Button
-                    key={tier}
-                    variant={tierFilter === tier ? 'default' : 'ghost'}
-                    size="sm"
-                    onClick={() => setTierFilter(tier)}
-                  >
-                    T{tier}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="text-xs uppercase text-muted-foreground mb-2">Display</p>
+          <div>
+            <p className="text-xs uppercase text-muted-foreground mb-2">Categories</p>
+            <div className="space-y-1">
               <Button
-                variant={hideMaxUpgrades ? 'default' : 'ghost'}
+                variant={categoryFilter === 'all' ? 'default' : 'ghost'}
                 className="w-full justify-start"
                 size="sm"
-                onClick={() => setHideMaxUpgrades(prev => !prev)}
+                onClick={() => setCategoryFilter('all')}
               >
-                Hide Max Upgrades
+                All categories
               </Button>
+              {(Object.keys(CATEGORY_LABELS) as UpgradeCategory[]).map(category => (
+                <Button
+                  key={category}
+                  variant={categoryFilter === category ? 'default' : 'ghost'}
+                  className="w-full justify-start"
+                  size="sm"
+                  onClick={() => setCategoryFilter(category)}
+                >
+                  {CATEGORY_LABELS[category]}
+                </Button>
+              ))}
             </div>
-          </aside>
+          </div>
 
-          <section className="flex-1 flex flex-col min-w-0">
-            <div className="border-b border-border p-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Available currency</p>
-                <p className="font-semibold text-foreground">{formatCurrency(state.currency)}</p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-                <X className="h-4 w-4" />
+          <div>
+            <p className="text-xs uppercase text-muted-foreground mb-2">Tier</p>
+            <div className="grid grid-cols-3 gap-1">
+              <Button
+                variant={tierFilter === 'all' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setTierFilter('all')}
+                className="col-span-3"
+              >
+                All
               </Button>
+              {tierOptions.map(tier => (
+                <Button
+                  key={tier}
+                  variant={tierFilter === tier ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setTierFilter(tier)}
+                >
+                  T{tier}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <section className="flex-1 flex flex-col min-w-0">
+          <div className="border-b border-border p-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm text-muted-foreground">Available currency</p>
+              <p className="font-semibold text-foreground">{formatCurrency(state.currency)}</p>
+            </div>
+            <Button
+              variant={hideMaxUpgrades ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => setHideMaxUpgrades(prev => !prev)}
+            >
+              Hide Max Upgrades
+            </Button>
+          </div>
+
+          <div className="p-3 overflow-y-auto space-y-5 flex-1">
+            <div>
+              <h3 className="text-sm font-semibold mb-2">Available now</h3>
+              {availableNow.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No upgrades currently affordable and unlocked.</p>
+              ) : (
+                <div className="grid gap-2">
+                  {availableNow.map(item => (
+                    <Button
+                      key={`available-${item.upgrade.id}`}
+                      variant="outline"
+                      className="justify-between h-auto py-2"
+                      onClick={() => actions.buyUpgrade(item.upgrade.id)}
+                    >
+                      <span className="truncate">{item.upgrade.name}</span>
+                      <span>{formatCurrency(item.cost)}</span>
+                    </Button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            <div className="p-4 overflow-y-auto space-y-5">
-              <div>
-                <h3 className="text-sm font-semibold mb-2">Available now</h3>
-                {availableNow.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No upgrades currently affordable and unlocked.</p>
-                ) : (
-                  <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-                    {availableNow.map(item => (
-                      <Button
-                        key={`available-${item.upgrade.id}`}
-                        variant="outline"
-                        className="justify-between h-auto py-2"
-                        onClick={() => actions.buyUpgrade(item.upgrade.id)}
-                      >
-                        <span className="truncate">{item.upgrade.name}</span>
-                        <span>{formatCurrency(item.cost)}</span>
-                      </Button>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="grid gap-3">
+              {upgradeRows.map(({ upgrade, currentLevel, nextLevel, cost, canBuy, lockReasons }) => {
+                const atMax = currentLevel >= upgrade.maxLevel;
+                const isAffordable = state.currency >= cost;
+                const isLocked = !atMax && lockReasons.length > 0;
+                const canBuyNow = !atMax && canBuy && isAffordable;
+                const topLockReasons = getTopLockReasons(lockReasons);
+                const visibleEffects = upgrade.effects.slice(0, VISIBLE_EFFECT_COUNT);
+                const hiddenEffects = upgrade.effects.slice(VISIBLE_EFFECT_COUNT);
+                const statusLabel = atMax
+                  ? 'Maxed'
+                  : isLocked
+                    ? 'Locked'
+                    : isAffordable
+                      ? 'Ready'
+                      : 'Unlocked • Need currency';
+                const statusClassName = atMax
+                  ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                  : isLocked
+                    ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+                    : isAffordable
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-blue-500/15 text-blue-600 dark:text-blue-400';
 
-              <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-3">
-                {upgradeRows.map(({ upgrade, currentLevel, nextLevel, cost, canBuy, lockReasons }) => {
-                  const atMax = currentLevel >= upgrade.maxLevel;
-                  const isAffordable = state.currency >= cost;
-                  const isLocked = !atMax && lockReasons.length > 0;
-                  const canBuyNow = !atMax && canBuy && isAffordable;
-                  const topLockReasons = getTopLockReasons(lockReasons);
-                  const visibleEffects = upgrade.effects.slice(0, VISIBLE_EFFECT_COUNT);
-                  const hiddenEffects = upgrade.effects.slice(VISIBLE_EFFECT_COUNT);
-                  const statusLabel = atMax
-                    ? 'Maxed'
-                    : isLocked
-                      ? 'Locked'
-                      : isAffordable
-                        ? 'Ready'
-                        : 'Unlocked • Need currency';
-                  const statusClassName = atMax
-                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                    : isLocked
-                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                      : isAffordable
-                        ? 'bg-primary/15 text-primary'
-                        : 'bg-blue-500/15 text-blue-600 dark:text-blue-400';
-
-                  return (
-                    <article key={upgrade.id} className="rounded-lg border border-border p-3 bg-card/50 space-y-2">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h4 className="font-semibold text-sm leading-tight">{upgrade.name}</h4>
-                          <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[upgrade.category]} • T{upgrade.tier}</p>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="text-xs rounded bg-muted px-2 py-0.5">Lv {currentLevel}/{upgrade.maxLevel}</span>
-                          <span className={`text-[10px] rounded px-2 py-0.5 ${statusClassName}`}>{statusLabel}</span>
-                        </div>
+                return (
+                  <article key={upgrade.id} className="rounded-lg border border-border p-3 bg-card/50 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-semibold text-sm leading-tight">{upgrade.name}</h4>
+                        <p className="text-xs text-muted-foreground">{CATEGORY_LABELS[upgrade.category]} • T{upgrade.tier}</p>
                       </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-xs rounded bg-muted px-2 py-0.5">Lv {currentLevel}/{upgrade.maxLevel}</span>
+                        <span className={`text-[10px] rounded px-2 py-0.5 ${statusClassName}`}>{statusLabel}</span>
+                      </div>
+                    </div>
 
-                      <p className="text-xs text-muted-foreground">{upgrade.description}</p>
+                    <p className="text-xs text-muted-foreground">{upgrade.description}</p>
+                    <div className="space-y-1">
+                      {visibleEffects.map((effect, effectIndex) => (
+                        <p key={`${upgrade.id}-effect-${effect.type}-${effectIndex}`} className="text-xs">
+                          {atMax ? (
+                            <>
+                              <span className="text-muted-foreground">Current effect:</span>{' '}
+                              {formatEffectAtLevel(effect, currentLevel)}
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-muted-foreground">Effect:</span>{' '}
+                              {formatEffectAtLevel(effect, currentLevel)} →{' '}
+                              {formatEffectAtLevel(effect, nextLevel)}
+                            </>
+                          )}
+                        </p>
+                      ))}
+                      {hiddenEffects.length > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="text-xs text-muted-foreground underline underline-offset-2"
+                            >
+                              +{hiddenEffects.length} more effects
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="space-y-1 max-w-xs">
+                              {hiddenEffects.map((effect, effectIndex) => (
+                                <p key={`${upgrade.id}-hidden-effect-${effect.type}-${effectIndex}`} className="text-xs">
+                                  {atMax
+                                    ? formatEffectAtLevel(effect, currentLevel)
+                                    : `${formatEffectAtLevel(effect, currentLevel)} → ${formatEffectAtLevel(effect, nextLevel)}`}
+                                </p>
+                              ))}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+
+                    <div className="text-xs text-muted-foreground">Cost: {atMax ? 'MAX' : formatCurrency(cost)}</div>
+
+                    {!atMax && topLockReasons.length > 0 && (
                       <div className="space-y-1">
-                        {visibleEffects.map((effect, effectIndex) => (
-                          <p key={`${upgrade.id}-effect-${effect.type}-${effectIndex}`} className="text-xs">
-                            {atMax ? (
-                              <>
-                                <span className="text-muted-foreground">Current effect:</span>{' '}
-                                {formatEffectAtLevel(effect, currentLevel)}
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-muted-foreground">Effect:</span>{' '}
-                                {formatEffectAtLevel(effect, currentLevel)} →{' '}
-                                {formatEffectAtLevel(effect, nextLevel)}
-                              </>
-                            )}
+                        {topLockReasons.map((reason, index) => (
+                          <p key={`${upgrade.id}-reason-${index}`} className="text-xs text-amber-500">
+                            {index === 0 ? `Primary lock: ${reason}` : `Secondary lock: ${reason}`}
                           </p>
                         ))}
-                        {hiddenEffects.length > 0 && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <button
-                                type="button"
-                                className="text-xs text-muted-foreground underline underline-offset-2"
-                              >
-                                +{hiddenEffects.length} more effects
-                              </button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <div className="space-y-1 max-w-xs">
-                                {hiddenEffects.map((effect, effectIndex) => (
-                                  <p key={`${upgrade.id}-hidden-effect-${effect.type}-${effectIndex}`} className="text-xs">
-                                    {atMax
-                                      ? formatEffectAtLevel(effect, currentLevel)
-                                      : `${formatEffectAtLevel(effect, currentLevel)} → ${formatEffectAtLevel(effect, nextLevel)}`}
-                                  </p>
-                                ))}
-                              </div>
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
                       </div>
+                    )}
 
-                      <div className="text-xs text-muted-foreground">Cost: {atMax ? 'MAX' : formatCurrency(cost)}</div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex gap-1">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted cursor-help">Scaling</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs text-xs">{getScalingText(upgrade)}</p>
+                          </TooltipContent>
+                        </Tooltip>
 
-                      {!atMax && topLockReasons.length > 0 && (
-                        <div className="space-y-1">
-                          {topLockReasons.map((reason, index) => (
-                            <p key={`${upgrade.id}-reason-${index}`} className="text-xs text-amber-500">
-                              {index === 0 ? `Primary lock: ${reason}` : `Secondary lock: ${reason}`}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted cursor-help">Prereqs</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-xs text-xs">
+                              {lockReasons.length > 0
+                                ? lockReasons.join(' • ')
+                                : 'All prerequisites met.'}
                             </p>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted cursor-help">Scaling</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs text-xs">{getScalingText(upgrade)}</p>
-                            </TooltipContent>
-                          </Tooltip>
-
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted cursor-help">Prereqs</span>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs text-xs">
-                                {lockReasons.length > 0
-                                  ? lockReasons.join(' • ')
-                                  : 'All prerequisites met.'}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </div>
-
-                        <Button
-                          size="sm"
-                          disabled={atMax || !canBuyNow}
-                          onClick={() => actions.buyUpgrade(upgrade.id)}
-                        >
-                          {atMax ? 'Maxed' : canBuyNow ? 'Buy' : isLocked ? 'Locked' : 'Need currency'}
-                        </Button>
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
-                    </article>
-                  );
-                })}
-              </div>
+
+                      <Button
+                        size="sm"
+                        disabled={atMax || !canBuyNow}
+                        onClick={() => actions.buyUpgrade(upgrade.id)}
+                      >
+                        {atMax ? 'Maxed' : canBuyNow ? 'Buy' : isLocked ? 'Locked' : 'Need currency'}
+                      </Button>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
-          </section>
-        </div>
-      </div>
+          </div>
+        </section>
+      </section>
     </TooltipProvider>
   );
 };

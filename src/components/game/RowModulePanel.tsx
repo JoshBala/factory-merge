@@ -7,7 +7,6 @@ import {
 
 interface RowModulePanelProps {
   onRowClick: (rowIndex: 0 | 1 | 2) => void;
-  onOpenUpgradeMenu?: () => void;
 }
 
 const ROW_LABELS = ['Top', 'Mid', 'Bot'] as const;
@@ -90,7 +89,7 @@ const getShortBonusName = (kind: string): string => {
   return shortNames[kind] || kind;
 };
 
-export const RowModulePanel = ({ onRowClick, onOpenUpgradeMenu }: RowModulePanelProps) => {
+export const RowModulePanel = ({ onRowClick }: RowModulePanelProps) => {
   const { state } = useGame();
 
   const getModule = (rowIndex: 0 | 1 | 2): RowModule | undefined =>
@@ -107,17 +106,6 @@ export const RowModulePanel = ({ onRowClick, onOpenUpgradeMenu }: RowModulePanel
           />
         </div>
       ))}
-
-      {onOpenUpgradeMenu && (
-        <button
-          type="button"
-          onClick={onOpenUpgradeMenu}
-          className="w-full rounded-lg border border-border bg-card/80 px-2 py-1 text-[10px] text-left text-foreground hover:bg-card transition-colors"
-          title="Open full upgrade menu"
-        >
-          Upgrades
-        </button>
-      )}
     </div>
   );
 };
