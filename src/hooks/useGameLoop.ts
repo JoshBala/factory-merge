@@ -11,11 +11,13 @@ interface UseGameLoopProps {
   dispatch: React.Dispatch<GameAction>;
 }
 
+type AutomationActionOps = Extract<GameAction, { type: 'RUN_AUTOMATION_OPS' }>['ops'];
+
 const mapPlannedOpsToActions = (
   ops: ReturnType<typeof planAutomationOps>,
   maxOps: number
-): GameAction['ops'] => {
-  const actionableOps: GameAction['ops'] = [];
+): AutomationActionOps => {
+  const actionableOps: AutomationActionOps = [];
 
   for (const op of ops) {
     if (actionableOps.length >= maxOps) break;
@@ -23,6 +25,7 @@ const mapPlannedOpsToActions = (
     if (op.kind === 'MERGE') {
       actionableOps.push({
         type: 'merge_machines',
+        ruleId: op.ruleId,
         sourceId: op.sourceId,
         targetId: op.targetId,
       });
@@ -32,6 +35,7 @@ const mapPlannedOpsToActions = (
     if (op.kind === 'MOVE') {
       actionableOps.push({
         type: 'move_machine',
+        ruleId: op.ruleId,
         machineId: op.machineId,
         targetSlot: op.targetSlot,
       });
