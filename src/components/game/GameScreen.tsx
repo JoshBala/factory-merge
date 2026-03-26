@@ -6,14 +6,12 @@ import { GameHUD } from './GameHUD';
 import { FactoryGrid } from './FactoryGrid';
 import { ActionBar } from './ActionBar';
 import { OfflineModal } from './OfflineModal';
-import { UpgradeMenu } from './UpgradeMenu';
 import { calculateOfflineEarnings } from '@/utils/calculations';
 import { loadGame } from '@/utils/storage';
 
 export const GameScreen = () => {
   const { state, dispatch } = useGame();
   const [offlineEarnings, setOfflineEarnings] = useState<number | null>(null);
-  const [showUpgradeMenu, setShowUpgradeMenu] = useState(false);
 
   // Start the game loop
   useGameLoop({ state, dispatch });
@@ -46,7 +44,7 @@ export const GameScreen = () => {
     <div className="min-h-screen flex flex-col bg-background">
       <GameHUD />
 
-      <FactoryGrid onOpenUpgradeMenu={() => setShowUpgradeMenu(true)} />
+      <FactoryGrid />
       <ActionBar />
 
       {/* Offline earnings modal */}
@@ -56,11 +54,6 @@ export const GameScreen = () => {
           onCollect={handleCollectOffline}
         />
       )}
-
-      <UpgradeMenu
-        isOpen={showUpgradeMenu}
-        onClose={() => setShowUpgradeMenu(false)}
-      />
     </div>
   );
 };
