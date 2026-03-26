@@ -8,7 +8,8 @@ export const createInitialState = (): GameState => ({
   selectedMachineId: null,
   lastTickTime: Date.now(),
   totalPlayTime: 0,
-  rowModules: [], // No modules initially
+  gridUpgrade: null,
+  rowModules: [], // Legacy save compatibility
   stats: {
     lifetimeCurrencyEarned: 0,
     lifetimeMachinesBought: 0,

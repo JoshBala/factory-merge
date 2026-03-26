@@ -33,6 +33,7 @@ const normalizeImportedState = (data: unknown): GameState | null => {
     ...partial,
     currency: typeof partial.currency === 'number' ? partial.currency : base.currency,
     machines: Array.isArray(partial.machines) ? partial.machines : base.machines,
+    gridUpgrade: partial.gridUpgrade ?? base.gridUpgrade,
     rowModules: Array.isArray(partial.rowModules) ? partial.rowModules : base.rowModules,
     activeDisaster: partial.activeDisaster ?? base.activeDisaster,
     selectedMachineId:

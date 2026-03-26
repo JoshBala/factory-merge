@@ -4,8 +4,8 @@ import { GameState, GameAction, Machine, GAME_CONFIG, AutomationBlockedReason, A
 import { BALANCE, getScrapRefund } from '@/config/balance';
 import { 
   generateId, calculateEarnings, canMerge, getMergedLevel, 
-  getRepairCost, createRowModule, upgradeRowModule, rerollRowBonuses,
-  getRowUpgradeCost, getRerollCost, getNextRarity
+  getRepairCost, createGridModule, upgradeGridModule, rerollGridBonuses,
+  getGridUpgradeCost, getRerollCost, getNextRarity
 } from '@/utils/calculations';
 import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
@@ -235,7 +235,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
         state.machines, 
         isPowerOutage, 
         action.deltaMs,
-        state.rowModules,
+        state.gridUpgrade,
         state
       );
       
@@ -401,74 +401,62 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       return createInitialState();
     }
 
+    case 'UPGRADE_GRID':
     case 'UPGRADE_ROW': {
-      const existingModule = state.rowModules.find(m => m.rowIndex === action.rowIndex);
-      const cost = getRowUpgradeCost(existingModule);
-      
+      const cost = getGridUpgradeCost(state.gridUpgrade);
       if (state.currency < cost) return state;
-      
-      if (!existingModule) {
-        // Create new module
-        const newModule = createRowModule(action.rowIndex);
+
+      if (!state.gridUpgrade) {
+        const newModule = createGridModule();
         return {
           ...state,
           currency: state.currency - cost,
-          rowModules: [...state.rowModules, newModule],
-        };
-      } else {
-        // Upgrade existing
-        if (!getNextRarity(existingModule.rarity)) return state;
-        
-        const upgraded = upgradeRowModule(existingModule);
-        if (!upgraded) return state;
-        
-        return {
-          ...state,
-          currency: state.currency - cost,
-          rowModules: state.rowModules.map(m =>
-            m.rowIndex === action.rowIndex ? upgraded : m
-          ),
+          gridUpgrade: newModule,
         };
       }
-    }
 
-    case 'REROLL_ROW_BONUSES': {
-      const module = state.rowModules.find(m => m.rowIndex === action.rowIndex);
-      if (!module) return state;
-      const hasUnlocked = module.bonuses.some(bonus => !bonus.locked);
-      if (!hasUnlocked) return state;
-      
-      const cost = getRerollCost(action.rowIndex);
-      if (state.currency < cost) return state;
-      
-      const updated = rerollRowBonuses(module);
-      
+      if (!getNextRarity(state.gridUpgrade.rarity)) return state;
+      const upgraded = upgradeGridModule(state.gridUpgrade);
+      if (!upgraded) return state;
+
       return {
         ...state,
         currency: state.currency - cost,
-        rowModules: state.rowModules.map(m =>
-          m.rowIndex === action.rowIndex ? updated : m
-        ),
+        gridUpgrade: upgraded,
       };
     }
 
-    case 'TOGGLE_ROW_BONUS_LOCK': {
-      const module = state.rowModules.find(m => m.rowIndex === action.rowIndex);
+    case 'REROLL_GRID_BONUSES':
+    case 'REROLL_ROW_BONUSES': {
+      const module = state.gridUpgrade;
       if (!module) return state;
-      if (action.bonusIndex >= module.bonuses.length) return state;
+      const hasUnlocked = module.bonuses.some(bonus => !bonus.locked);
+      if (!hasUnlocked) return state;
 
-      const updated = {
-        ...module,
-        bonuses: module.bonuses.map((bonus, idx) =>
-          idx === action.bonusIndex ? { ...bonus, locked: !bonus.locked } : bonus
-        ),
-      };
+      const cost = getRerollCost();
+      if (state.currency < cost) return state;
 
       return {
         ...state,
-        rowModules: state.rowModules.map(m =>
-          m.rowIndex === action.rowIndex ? updated : m
-        ),
+        currency: state.currency - cost,
+        gridUpgrade: rerollGridBonuses(module),
+      };
+    }
+
+    case 'TOGGLE_GRID_BONUS_LOCK':
+    case 'TOGGLE_ROW_BONUS_LOCK': {
+      const module = state.gridUpgrade;
+      if (!module) return state;
+      if (action.bonusIndex >= module.bonuses.length) return state;
+
+      return {
+        ...state,
+        gridUpgrade: {
+          ...module,
+          bonuses: module.bonuses.map((bonus, idx) =>
+            idx === action.bonusIndex ? { ...bonus, locked: !bonus.locked } : bonus
+          ),
+        },
       };
     }
 
@@ -732,6 +720,10 @@ interface GameContextType {
     mergeMachines: (sourceId: string, targetId: string) => void;
     repairMachine: (id: string) => void;
     resetGame: () => void;
+    upgradeGrid: () => void;
+    rerollGridBonuses: () => void;
+    toggleGridBonusLock: (bonusIndex: number) => void;
+    // Legacy aliases
     upgradeRow: (rowIndex: 0 | 1 | 2) => void;
     rerollBonus: (rowIndex: 0 | 1 | 2) => void;
     toggleBonusLock: (rowIndex: 0 | 1 | 2, bonusIndex: number) => void;
@@ -792,12 +784,18 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
       dispatch({ type: 'REPAIR_MACHINE', machineId: id }), []),
     resetGame: useCallback(() => 
       dispatch({ type: 'RESET_GAME' }), []),
-    upgradeRow: useCallback((rowIndex: 0 | 1 | 2) =>
-      dispatch({ type: 'UPGRADE_ROW', rowIndex }), []),
-    rerollBonus: useCallback((rowIndex: 0 | 1 | 2) =>
-      dispatch({ type: 'REROLL_ROW_BONUSES', rowIndex }), []),
-    toggleBonusLock: useCallback((rowIndex: 0 | 1 | 2, bonusIndex: number) =>
-      dispatch({ type: 'TOGGLE_ROW_BONUS_LOCK', rowIndex, bonusIndex }), []),
+    upgradeGrid: useCallback(() =>
+      dispatch({ type: 'UPGRADE_GRID' }), []),
+    rerollGridBonuses: useCallback(() =>
+      dispatch({ type: 'REROLL_GRID_BONUSES' }), []),
+    toggleGridBonusLock: useCallback((bonusIndex: number) =>
+      dispatch({ type: 'TOGGLE_GRID_BONUS_LOCK', bonusIndex }), []),
+    upgradeRow: useCallback((_rowIndex: 0 | 1 | 2) =>
+      dispatch({ type: 'UPGRADE_GRID' }), []),
+    rerollBonus: useCallback((_rowIndex: 0 | 1 | 2) =>
+      dispatch({ type: 'REROLL_GRID_BONUSES' }), []),
+    toggleBonusLock: useCallback((_rowIndex: 0 | 1 | 2, bonusIndex: number) =>
+      dispatch({ type: 'TOGGLE_GRID_BONUS_LOCK', bonusIndex }), []),
     moveMachine: useCallback((machineId: string, targetSlot: number) =>
       dispatch({ type: 'MOVE_MACHINE', machineId, targetSlot }), []),
     scrapMachine: useCallback((machineId: string) =>
