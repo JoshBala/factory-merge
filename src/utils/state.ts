@@ -17,7 +17,7 @@ export const createInitialState = (): GameState => ({
   },
   ownedUpgrades: {},
   automation: {
-    enabled: false,
+    enabled: true,
     rules: [],
     runtime: {
       lastRunAt: null,

@@ -2,6 +2,7 @@
 import { SAVE_VERSION } from '@/config/version';
 import { GameState } from '@/types/game';
 import { migrateGameState } from '@/utils/migrations';
+import { sanitizeAutomationState } from '@/utils/automationValidation';
 
 const STORAGE_KEY = 'idle_merge_factory_save';
 
@@ -9,6 +10,7 @@ export const createSaveData = (state: GameState): GameState => ({
   ...state,
   saveVersion: SAVE_VERSION,
   lastTickTime: Date.now(), // Always update timestamp on save
+  automation: sanitizeAutomationState(state.automation, { defaultEnabled: true }),
 });
 
 export const saveGame = (state: GameState): void => {

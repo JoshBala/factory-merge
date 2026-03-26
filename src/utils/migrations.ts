@@ -1,4 +1,5 @@
 import { BONUS_RANGES, BonusKind, GameState, RowBonus, RowModule } from '@/types/game';
+import { sanitizeAutomationState } from '@/utils/automationValidation';
 
 const migrateOwnedUpgrades = (ownedUpgrades: unknown): Record<string, number> => {
   if (!ownedUpgrades || typeof ownedUpgrades !== 'object' || Array.isArray(ownedUpgrades)) {
@@ -54,57 +55,18 @@ const migrateRowModules = (modules: RowModule[] = []): RowModule[] =>
     bonuses: module.bonuses.map(bonus => migrateRowBonus(bonus, module.rarity)),
   }));
 
-const migrateAutomationState = (automation: Partial<GameState>['automation']): GameState['automation'] => {
-  const runtime = automation?.runtime;
-  const blockedReasons = runtime?.debugMetrics?.blockedReasons;
+const AUTOMATION_VALIDATION_ROLLOUT_VERSION = 2;
 
-  return {
-    enabled: automation?.enabled ?? false,
-    rules: Array.isArray(automation?.rules) ? automation.rules : [],
-    runtime: {
-      lastRunAt: typeof runtime?.lastRunAt === 'number' ? runtime.lastRunAt : null,
-      pendingQueue: Array.isArray(runtime?.pendingQueue)
-        ? runtime.pendingQueue.filter((entry): entry is string => typeof entry === 'string')
-        : [],
-      opsPerTickBudget:
-        typeof runtime?.opsPerTickBudget === 'number' && Number.isFinite(runtime.opsPerTickBudget) && runtime.opsPerTickBudget > 0
-          ? Math.floor(runtime.opsPerTickBudget)
-          : 1,
-      triggerFlags: {
-        afterBuyMachine: Boolean(runtime?.triggerFlags?.afterBuyMachine),
-        afterMergeMachines: Boolean(runtime?.triggerFlags?.afterMergeMachines),
-        afterScrapOrMoveMachine: Boolean(runtime?.triggerFlags?.afterScrapOrMoveMachine),
-      },
-      debugMetrics: {
-        attemptedOps:
-          typeof runtime?.debugMetrics?.attemptedOps === 'number' && Number.isFinite(runtime.debugMetrics.attemptedOps)
-            ? Math.max(0, Math.floor(runtime.debugMetrics.attemptedOps))
-            : 0,
-        successfulOps:
-          typeof runtime?.debugMetrics?.successfulOps === 'number' && Number.isFinite(runtime.debugMetrics.successfulOps)
-            ? Math.max(0, Math.floor(runtime.debugMetrics.successfulOps))
-            : 0,
-        blockedReasons: {
-          no_match:
-            typeof blockedReasons?.no_match === 'number' && Number.isFinite(blockedReasons.no_match)
-              ? Math.max(0, Math.floor(blockedReasons.no_match))
-              : 0,
-          cooldown:
-            typeof blockedReasons?.cooldown === 'number' && Number.isFinite(blockedReasons.cooldown)
-              ? Math.max(0, Math.floor(blockedReasons.cooldown))
-              : 0,
-          disabled:
-            typeof blockedReasons?.disabled === 'number' && Number.isFinite(blockedReasons.disabled)
-              ? Math.max(0, Math.floor(blockedReasons.disabled))
-              : 0,
-          full_grid:
-            typeof blockedReasons?.full_grid === 'number' && Number.isFinite(blockedReasons.full_grid)
-              ? Math.max(0, Math.floor(blockedReasons.full_grid))
-              : 0,
-        },
-      },
-    },
-  };
+const migrateAutomationState = (
+  automation: Partial<GameState>['automation'],
+  saveVersion: number
+): GameState['automation'] => {
+  const defaultEnabled = saveVersion >= AUTOMATION_VALIDATION_ROLLOUT_VERSION;
+  const sanitized = sanitizeAutomationState(automation, { defaultEnabled });
+  if (saveVersion < AUTOMATION_VALIDATION_ROLLOUT_VERSION) {
+    return { ...sanitized, enabled: false };
+  }
+  return sanitized;
 };
 
 export const migrateGameState = (state: Partial<GameState>): GameState => ({
@@ -118,5 +80,5 @@ export const migrateGameState = (state: Partial<GameState>): GameState => ({
   },
   rowModules: migrateRowModules(state.rowModules || []),
   ownedUpgrades: migrateOwnedUpgrades(state.ownedUpgrades),
-  automation: migrateAutomationState(state.automation),
+  automation: migrateAutomationState(state.automation, state.saveVersion ?? 0),
 });
