@@ -227,7 +227,7 @@ const executeAutomationOpSafely = (
 };
 
 // === REDUCER ===
-const gameReducer = (state: GameState, action: GameAction): GameState => {
+export const gameReducer = (state: GameState, action: GameAction): GameState => {
   switch (action.type) {
     case 'TICK': {
       const isPowerOutage = state.activeDisaster?.type === 'powerOutage';
