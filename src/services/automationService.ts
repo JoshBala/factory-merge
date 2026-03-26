@@ -53,6 +53,8 @@ export const createAutomationRulePayload = (input: CreateAutomationRuleInput): A
   triggerType: input.triggerType,
   sourceRowFilter: input.sourceRowFilter ?? [0, 1, 2],
   targetRowFilter: input.targetRowFilter ?? [0, 1, 2],
+  // Keep default slot filters empty to represent wildcard semantics ("any slot").
+  // The planner expands an empty targetSlotFilter across the full grid when evaluating moves.
   sourceSlotFilter: input.sourceSlotFilter ?? [],
   targetSlotFilter: input.targetSlotFilter ?? [],
   cooldownMs: Math.max(0, input.cooldownMs ?? 0),

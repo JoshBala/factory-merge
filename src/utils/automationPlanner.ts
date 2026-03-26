@@ -1,4 +1,5 @@
 import type { AutomationRule, AutomationState, GameState, Machine } from '@/types/game';
+import { BALANCE } from '@/config/balance';
 import { EMPTY_UPGRADE_EFFECT_PROJECTION, type UpgradeEffectProjection } from '@/utils/upgradeEffects';
 import { canMerge, getRowForSlot } from '@/utils/calculations';
 
@@ -126,8 +127,10 @@ const findMoveOp = (
   const sortedMachines = sortMachinesDeterministically(machines);
   const occupiedSlots = new Set(sortedMachines.map((machine) => machine.slotIndex));
 
-  const targetCandidates = [...rule.targetSlotFilter].sort((a, b) => a - b);
-  if (targetCandidates.length === 0) return null;
+  const targetCandidates =
+    rule.targetSlotFilter.length > 0
+      ? [...rule.targetSlotFilter].sort((a, b) => a - b)
+      : Array.from({ length: BALANCE.gridSize }, (_, index) => index);
 
   for (const source of sortedMachines) {
     if (!machineMatchesSource(source, rule)) continue;
