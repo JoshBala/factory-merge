@@ -1,56 +1,20 @@
 // === HUD: Currency display + disaster status ===
 import { useGame } from '@/contexts/GameContext';
-import { 
-  formatCurrency, 
-  calculateProductionRate, 
+import {
+  formatCurrency,
+  calculateProductionRate,
   calculateBaseProductionRate,
   getNextRarity,
   getGridUpgradeCost,
   resolveGameEffects,
+  getRarityName,
 } from '@/utils/calculations';
-import { Machine } from '@/types/game';
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
-import { BALANCE, getProductionRate } from '@/config/balance';
 import { GameMenuModal } from './GameMenuModal';
 import { AutomationPanel } from './AutomationPanel';
 import { getCompletedTier, getTierProgress } from '@/config/upgrades';
 import { selectAutomationSelectors } from '@/services/automationService';
-
-type DebugPurchase =
-  | { key: string; label: string; cost: number; kind: 'machine'; slotIndex: number }
-  | { key: string; label: string; cost: number; kind: 'grid_upgrade' };
-
-// Calculate per-row contribution
-const getRowContributions = (
-  machines: Machine[],
-  effects: ReturnType<typeof resolveGameEffects>
-) => {
-  const rowNames = ['Top', 'Mid', 'Bot'] as const;
-  const rows = ([0, 1, 2] as const).map(rowIndex => {
-    const start = rowIndex * BALANCE.gridColumns;
-    const slots = Array.from({ length: BALANCE.gridColumns }, (_, offset) => start + offset);
-    return { name: rowNames[rowIndex], index: rowIndex, slots };
-  });
-  
-  return rows.map(row => {
-    const rowMachines = machines.filter(m => row.slots.includes(m.slotIndex) && !m.disabled);
-    // Use procedural production rate
-    const baseRate = rowMachines.reduce((sum, m) => sum + getProductionRate(m.level), 0);
-    const bonus = effects.byGridPercent.productionPercent / 100;
-    const modifiedRate = rowMachines.reduce((sum, machine) => {
-      const gridBonusMultiplier = 1 + effects.byGridPercent.productionPercent / 100;
-      const mergeBonusMultiplier = machine.level > 1 ? 1 + effects.byKindPercent.productionAfterMerge / 100 : 1;
-      return sum + getProductionRate(machine.level) * gridBonusMultiplier * effects.productionMultiplier * mergeBonusMultiplier;
-    }, 0);
-    return {
-      name: row.name,
-      baseRate,
-      bonus,
-      modifiedRate,
-    };
-  });
-};
 
 // Format rate with K/M/B support
 const formatRate = (rate: number): string => {
@@ -63,42 +27,26 @@ export const GameHUD = () => {
   const { state } = useGame();
   const [disasterTimer, setDisasterTimer] = useState<number | null>(null);
   const [showDebug, setShowDebug] = useState(false);
-  const [selectedPurchaseKey, setSelectedPurchaseKey] = useState<string>('machine');
-
+  
   // Calculate rates using unified function
   const isPowerOutage = state.activeDisaster?.type === 'powerOutage';
   const modifiedRate = calculateProductionRate(state.machines, isPowerOutage, state.gridUpgrade, state);
   const baseRate = calculateBaseProductionRate(state.machines);
   const effects = resolveGameEffects(state.gridUpgrade, state);
-  const rowContributions = getRowContributions(state.machines, effects);
 
-  const emptySlots = Array.from({ length: BALANCE.gridSize }, (_, index) => index)
-    .filter(slotIndex => !state.machines.some(machine => machine.slotIndex === slotIndex));
-
-  const purchaseOptions: DebugPurchase[] = [
-    ...(emptySlots.length > 0
-      ? [{
-          key: 'machine',
-          label: `Buy machine (slot ${emptySlots[0] + 1})`,
-          cost: BALANCE.baseMachineCost,
-          kind: 'machine' as const,
-          slotIndex: emptySlots[0],
-        }]
-      : []),
-    ...(() => {
-      const module = state.gridUpgrade;
-      const nextRarity = module ? getNextRarity(module.rarity) : 'common';
-      if (module && !nextRarity) return [];
-      return [{
+  const module = state.gridUpgrade;
+  const nextRarity = module ? getNextRarity(module.rarity) : 'common';
+  const nextGridUpgrade = module && !nextRarity
+    ? null
+    : {
         key: 'grid-upgrade',
-        label: module ? 'Upgrade grid module' : 'Unlock grid module',
+        label: module
+          ? `Upgrade grid module to ${getRarityName(nextRarity!)}`
+          : 'Unlock grid module',
         cost: getGridUpgradeCost(module),
-        kind: 'grid_upgrade' as const,
-      }];
-    })(),
-  ];
+      };
 
-  const selectedPurchase = purchaseOptions.find(option => option.key === selectedPurchaseKey) ?? purchaseOptions[0];
+  const selectedPurchase = nextGridUpgrade;
   const rateForAfford = Math.max(modifiedRate, 0);
   const toAffordSeconds = (cost: number) => {
     if (state.currency >= cost) return 0;
@@ -106,14 +54,7 @@ export const GameHUD = () => {
     return (cost - state.currency) / rateForAfford;
   };
   const beforeRate = modifiedRate;
-  const afterRate = selectedPurchase?.kind === 'machine'
-      ? calculateProductionRate(
-        [...state.machines, { id: 'debug-machine', level: 1, slotIndex: selectedPurchase.slotIndex, disabled: false }],
-        isPowerOutage,
-        state.gridUpgrade,
-        state
-      )
-    : null;
+  const afterRate = null;
 
   const ownedUpgrades = (state as Record<string, unknown>).ownedUpgrades as Record<string, number> | undefined;
   const tierProgress = getTierProgress(ownedUpgrades ?? {});
@@ -193,64 +134,49 @@ export const GameHUD = () => {
             </div>
           </div>
           <div className="border-t border-border mt-2 pt-2">
-            <div className="text-muted-foreground mb-1">Per-row breakdown:</div>
-            {rowContributions.map(row => (
-              <div key={row.name} className="flex justify-between">
-                <span>{row.name}:</span>
-                <span>
-                  {formatRate(row.baseRate).replace('/s', '')} → {formatRate(row.modifiedRate).replace('/s', '')}
-                  {row.bonus > 0 && (
-                    <span className="text-green-500 ml-1">(+{(row.bonus * 100).toFixed(0)}%)</span>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="border-t border-border mt-2 pt-2">
-            <div className="text-muted-foreground mb-1">Time to afford next upgrades:</div>
-            <div className="space-y-1">
-              {purchaseOptions.map(option => {
-                const seconds = toAffordSeconds(option.cost);
-                const timeLabel = Number.isFinite(seconds)
-                  ? seconds === 0
-                    ? 'now'
-                    : `${seconds.toFixed(1)}s`
-                  : '∞';
-                return (
-                  <div key={option.key} className="flex justify-between">
-                    <span>{option.label}:</span>
-                    <span>{timeLabel}</span>
-                  </div>
-                );
-              })}
-              {purchaseOptions.length === 0 && (
-                <div className="text-muted-foreground">No eligible purchases</div>
-              )}
-            </div>
-          </div>
-          <div className="border-t border-border mt-2 pt-2">
-            <div className="text-muted-foreground mb-1">Rate impact preview:</div>
-            <select
-              className="w-full rounded border border-border bg-background px-2 py-1 mb-2"
-              value={selectedPurchase?.key ?? ''}
-              onChange={(event) => setSelectedPurchaseKey(event.target.value)}
-            >
-              {purchaseOptions.map(option => (
-                <option key={option.key} value={option.key}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <div className="text-muted-foreground mb-1">Grid-wide contribution:</div>
             <div className="flex justify-between">
-              <span>Before:</span>
-              <span>{formatRate(beforeRate)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>After:</span>
-              <span className="text-green-500">
-                {afterRate === null ? 'N/A (bonus roll dependent)' : formatRate(afterRate)}
+              <span>Total production:</span>
+              <span>
+                {formatRate(baseRate).replace('/s', '')} → {formatRate(modifiedRate).replace('/s', '')}
               </span>
             </div>
+            <div className="flex justify-between">
+              <span>Grid module bonus:</span>
+              <span className="text-green-500">+{effects.byGridPercent.productionPercent.toFixed(1)}%</span>
+            </div>
+          </div>
+          <div className="border-t border-border mt-2 pt-2">
+            <div className="text-muted-foreground mb-1">Next grid-upgrade preview:</div>
+            {selectedPurchase ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Upgrade:</span>
+                  <span>{selectedPurchase.label}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Time to afford:</span>
+                  <span>{(() => {
+                    const seconds = toAffordSeconds(selectedPurchase.cost);
+                    return Number.isFinite(seconds)
+                      ? (seconds === 0 ? 'now' : `${seconds.toFixed(1)}s`)
+                      : '∞';
+                  })()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Before:</span>
+                  <span>{formatRate(beforeRate)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>After:</span>
+                  <span className="text-green-500">
+                    {afterRate === null ? 'N/A (bonus roll dependent)' : formatRate(afterRate)}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="text-muted-foreground">Max grid rarity reached.</div>
+            )}
           </div>
           <div className="border-t border-border mt-2 pt-2">
             <div className="text-muted-foreground mb-1">Tier completion:</div>

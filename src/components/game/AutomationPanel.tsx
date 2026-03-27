@@ -19,10 +19,10 @@ export const AutomationPanel = () => {
   const { state, actions } = useGame();
   const [open, setOpen] = useState(false);
 
-  const effects = resolveGameEffects(state.gridUpgrade, state);
+  const gridEffects = resolveGameEffects(state.gridUpgrade, state);
   const automationSummary = createAutomationRuleSummary(state);
   const presets = listAutomationPresets();
-  const selectors = selectAutomationSelectors(state, effects.automationIntervalMs);
+  const selectors = selectAutomationSelectors(state, gridEffects.automationIntervalMs);
   const blockedReasons = state.automation.runtime.debugMetrics.blockedReasons;
 
   const blockedReasonEntries = useMemo(

@@ -35,7 +35,7 @@ export const GridUpgradesPanel = () => {
 
       <div className="rounded-lg border border-border bg-card/80 p-3 space-y-3">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold text-foreground">Grid Module</h3>
+          <h3 className="text-sm font-semibold text-foreground">Global Grid Module</h3>
           {module ? (
             <span className={`px-2 py-0.5 rounded text-xs text-white font-medium ${getRarityColor(module.rarity)}`}>
               {getRarityName(module.rarity)}
@@ -97,10 +97,6 @@ export const GridUpgradesPanel = () => {
             </Button>
           )}
         </div>
-
-        <p className="rounded-md border border-border bg-background/50 px-2.5 py-2 text-xs text-muted-foreground">
-          Bonuses and rerolls in this module affect every machine in the entire grid.
-        </p>
       </div>
     </aside>
   );
