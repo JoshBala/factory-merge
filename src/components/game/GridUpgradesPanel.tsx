@@ -12,7 +12,7 @@ import {
   getGridRerollCost,
 } from '@/utils/calculations';
 
-export const RowUpgradesPanel = () => {
+export const GridUpgradesPanel = () => {
   const { state, actions } = useGame();
   const module = state.gridUpgrade;
 
