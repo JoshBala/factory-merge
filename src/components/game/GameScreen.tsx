@@ -8,6 +8,7 @@ import { ActionBar } from './ActionBar';
 import { OfflineModal } from './OfflineModal';
 import { calculateOfflineEarnings } from '@/utils/calculations';
 import { loadGame } from '@/utils/storage';
+import { migrateGameState } from '@/utils/migrations';
 
 export const GameScreen = () => {
   const { state, dispatch } = useGame();
@@ -19,17 +20,21 @@ export const GameScreen = () => {
   // Check for offline earnings on mount
   useEffect(() => {
     const saved = loadGame();
-    if (saved && saved.machines.length > 0) {
-      const { earnings, timeAway } = calculateOfflineEarnings(
-        saved.machines,
-        saved.lastTickTime,
-        saved.gridUpgrade ?? null,
-        saved
-      );
-      // Show modal if away > 1 minute and earned something
-      if (earnings > 0 && timeAway > 60000) {
-        setOfflineEarnings(earnings);
-      }
+    if (!saved || saved.machines.length === 0) {
+      return;
+    }
+
+    const migrated = migrateGameState(saved);
+    const { earnings, timeAway } = calculateOfflineEarnings(
+      migrated.machines,
+      migrated.lastTickTime,
+      migrated.gridUpgrade,
+      migrated
+    );
+
+    // Show modal if away > 1 minute and earned something
+    if (earnings > 0 && timeAway > 60000) {
+      setOfflineEarnings(earnings);
     }
   }, []);
 

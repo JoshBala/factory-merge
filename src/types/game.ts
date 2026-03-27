@@ -229,10 +229,6 @@ export type GameAction =
   | { type: 'UPGRADE_GRID' }
   | { type: 'REROLL_GRID_BONUSES' }
   | { type: 'TOGGLE_GRID_BONUS_LOCK'; bonusIndex: number }
-  // Legacy action compatibility
-  | { type: 'UPGRADE_ROW'; rowIndex: 0 | 1 | 2 }
-  | { type: 'REROLL_ROW_BONUSES'; rowIndex: 0 | 1 | 2 }
-  | { type: 'TOGGLE_ROW_BONUS_LOCK'; rowIndex: 0 | 1 | 2; bonusIndex: number }
   | { type: 'MOVE_MACHINE'; machineId: string; targetSlot: number }
   | { type: 'SCRAP_MACHINE'; machineId: string }
   | { type: 'BUY_UPGRADE'; upgradeId: UpgradeId }

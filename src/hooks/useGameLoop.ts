@@ -183,7 +183,7 @@ export const useGameLoop = ({ state, dispatch }: UseGameLoopProps): void => {
   }, [dispatch]);
 };
 
-// Calculate global disaster duration reduction from all row modules
+// Calculate global disaster duration reduction from the active grid upgrade
 const getGlobalDisasterReduction = (gridUpgrade: GridModule | null): number => {
   const effects = resolveGameEffects(gridUpgrade);
   // Cap at 80% reduction to keep some challenge
@@ -209,7 +209,7 @@ const generateDisaster = (state: GameState, gridUpgrade: GridModule | null): Dis
     };
   } else {
     // Power outage affects all, auto-resolves
-    // Apply disaster duration reduction from row modules
+    // Apply disaster duration reduction from active grid-upgrade bonuses
     const baseDuration = randomInRange(
       GAME_CONFIG.powerOutageDuration.min,
       GAME_CONFIG.powerOutageDuration.max
