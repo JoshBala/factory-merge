@@ -9,14 +9,14 @@ import {
   getNextRarity,
   getRarityColor,
   getRarityName,
-  getGridRerollCost,
+  getGridRerollCostForModule,
 } from '@/utils/calculations';
 
 export const GridUpgradesPanel = () => {
   const { state, actions } = useGame();
   const module = state.gridUpgrade;
 
-  const rerollCost = getGridRerollCost();
+  const rerollCost = getGridRerollCostForModule(module);
   const upgradeCost = getGridUpgradeCost(module);
   const nextRarity = module ? getNextRarity(module.rarity) : 'common';
   const isMaxed = Boolean(module && !nextRarity);
