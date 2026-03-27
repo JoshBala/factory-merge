@@ -1,7 +1,7 @@
-// === 3x3 Factory Grid with persistent row upgrades panel ===
+// === 3x3 Factory Grid with persistent grid upgrades panel ===
 import { useGame } from '@/contexts/GameContext';
 import { MachineSlot } from './MachineSlot';
-import { RowUpgradesPanel } from './RowUpgradesPanel';
+import { GridUpgradesPanel } from './GridUpgradesPanel';
 import { GAME_CONFIG } from '@/types/game';
 import { MachineDragProvider, useMachineDrag } from './DragContext';
 import { getLevelColor } from './machineTileUtils';
@@ -56,7 +56,7 @@ const FactoryGridContent = () => {
   return (
     <div className="p-4 flex-1 flex items-center justify-center">
       <div className="w-full max-w-[1400px] grid gap-4 lg:grid-cols-[minmax(300px,360px)_auto_minmax(360px,400px)] items-start">
-        <RowUpgradesPanel />
+        <GridUpgradesPanel />
 
         {/* Fixed 3x3 grid (guarded in balance config). */}
         <div
