@@ -5,7 +5,7 @@ import { BALANCE, getScrapRefund } from '@/config/balance';
 import { 
   generateId, calculateEarnings, canMerge, getMergedLevel, 
   getRepairCost, createGridModule, upgradeGridModule, rerollGridBonuses,
-  getGridUpgradeCost, getGridRerollCost, getNextRarity
+  getGridUpgradeCost, getGridRerollCostForModule, getNextRarity
 } from '@/utils/calculations';
 import { saveGame, loadGame, deleteSave } from '@/utils/storage';
 import { migrateGameState } from '@/utils/migrations';
@@ -431,7 +431,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       const hasUnlocked = module.bonuses.some(bonus => !bonus.locked);
       if (!hasUnlocked) return state;
 
-      const cost = getGridRerollCost();
+      const cost = getGridRerollCostForModule(module);
       if (state.currency < cost) return state;
 
       return {

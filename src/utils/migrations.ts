@@ -1,4 +1,4 @@
-import { BONUS_RANGES, BonusKind, GameState, GridModule, RowBonus, RowModule } from '@/types/game';
+import { BONUS_RANGES, BonusKind, GameState, GridModule, RARITY_BONUS_COUNT, RowBonus, RowModule } from '@/types/game';
 import { sanitizeAutomationState } from '@/utils/automationValidation';
 
 const migrateOwnedUpgrades = (ownedUpgrades: unknown): Record<string, number> => {
@@ -59,11 +59,27 @@ const migrateGridUpgrade = (
   gridUpgrade: GridModule | null | undefined,
   rowModules: RowModule[]
 ): GridModule | null => {
-  if (gridUpgrade && Array.isArray(gridUpgrade.bonuses)) {
+  const sanitizeGridModule = (module: GridModule): GridModule => {
+    const maxBonuses = RARITY_BONUS_COUNT[module.rarity];
+    const normalizedBonuses = module.bonuses
+      .map(bonus => migrateRowBonus(bonus, module.rarity))
+      .slice(0, maxBonuses)
+      .map((bonus) => {
+        const [min, max] = BONUS_RANGES[bonus.kind][module.rarity];
+        return {
+          ...bonus,
+          value: Math.min(max, Math.max(min, bonus.value)),
+        };
+      });
+
     return {
-      ...gridUpgrade,
-      bonuses: gridUpgrade.bonuses.map(bonus => migrateRowBonus(bonus, gridUpgrade.rarity)),
+      ...module,
+      bonuses: normalizedBonuses,
     };
+  };
+
+  if (gridUpgrade && Array.isArray(gridUpgrade.bonuses)) {
+    return sanitizeGridModule(gridUpgrade);
   }
 
   // Legacy rowModules -> gridUpgrade policy (deterministic):
@@ -88,7 +104,7 @@ const migrateGridUpgrade = (
 
     return a.rowIndex - b.rowIndex;
   })[0];
-  return fallback ? { rarity: fallback.rarity, bonuses: fallback.bonuses } : null;
+  return fallback ? sanitizeGridModule({ rarity: fallback.rarity, bonuses: fallback.bonuses }) : null;
 };
 
 const AUTOMATION_VALIDATION_ROLLOUT_VERSION = 2;

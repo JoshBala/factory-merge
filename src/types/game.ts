@@ -150,7 +150,7 @@ export const GAME_CONFIG = {
   // Row module costs
   rowModuleCosts: BALANCE.rowModuleCosts as Record<Rarity, number>,
 
-  // Reroll cost per row (scales)
+  // Global grid reroll base cost (actual cost may scale by rarity)
   rerollBaseCost: BALANCE.rerollBaseCost,
 } as const;
 
@@ -163,12 +163,18 @@ export const RARITY_BONUS_COUNT: Record<Rarity, number> = {
 };
 
 // Bonus ranges per rarity tier: [min, max] as percentages
+// Rebalance pass (2026-03-27) — suspected overtuned entries after row→single-grid convergence:
+// - productionPercent: target delta ≈ -25% across tiers (global layer is now always-on, avoid snowball).
+// - automationSpeed: target delta ≈ -20% across tiers (already stacks with upgrade automation speed).
+// - offlineEarningsPercent: target delta ≈ -20% across tiers (preserve offline cap behavior without runaway).
+// - disasterDurationReduction / upgradeCostReduction remain clamp-protected in resolver; migration now sanitizes
+//   bonus count and per-bonus ranges to avoid accidental triple-preservation from legacy row data.
 export const BONUS_RANGES: Record<BonusKind, Record<Rarity, [number, number]>> = {
   productionPercent: {
-    common: [5, 10],
-    uncommon: [10, 20],
-    rare: [20, 35],
-    epic: [35, 50],
+    common: [4, 8],
+    uncommon: [8, 16],
+    rare: [16, 28],
+    epic: [28, 40],
   },
   productionAfterMerge: {
     common: [3, 8],
@@ -201,16 +207,16 @@ export const BONUS_RANGES: Record<BonusKind, Record<Rarity, [number, number]>> =
     epic: [20, 30],
   },
   automationSpeed: {
-    common: [5, 10],
-    uncommon: [10, 20],
-    rare: [20, 35],
-    epic: [35, 50],
+    common: [4, 8],
+    uncommon: [8, 16],
+    rare: [16, 28],
+    epic: [28, 40],
   },
   offlineEarningsPercent: {
-    common: [5, 10],
-    uncommon: [10, 20],
-    rare: [20, 35],
-    epic: [35, 50],
+    common: [4, 8],
+    uncommon: [8, 16],
+    rare: [16, 28],
+    epic: [28, 40],
   },
 };
 

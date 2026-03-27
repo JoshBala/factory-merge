@@ -52,13 +52,19 @@ export const BALANCE = {
   maxOfflineHours: 8,            // Cap offline time at 8 hours
 
   // === ROW MODULES ===
+  // Rebalance note (single-grid economy):
+  // - Legacy design had 3 independent row tracks; a single active grid module needs steeper
+  //   progression to preserve pacing and prevent underpriced rarity rushes.
+  // - Target deltas vs prior curve: common +200%, uncommon +200%, rare +200%, epic +200%.
   rowModuleCosts: {
-    common: 100,
-    uncommon: 500,
-    rare: 2000,
-    epic: 10000,
+    common: 300,
+    uncommon: 1500,
+    rare: 6000,
+    epic: 30000,
   } as Record<string, number>,
-  rerollBaseCost: 50,            // Base cost for rerolling bonuses
+  // Rebalance note (single-grid reroll): base raised to offset loss of row-index 1x/2x/3x curve.
+  // Target delta vs old row-0 baseline: +100% base before rarity scaling.
+  rerollBaseCost: 100,
 } as const;
 
 // Guardrail: keep runtime config coherent for all row-based formulas.

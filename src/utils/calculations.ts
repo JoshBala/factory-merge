@@ -120,6 +120,8 @@ export const resolveGameEffects = (
     return acc;
   }, { ...EMPTY_GRID_BONUSES });
 
+  // `productionPercent` must be applied exactly once as the global production layer.
+  // Per-machine logic should only add *orthogonal* layers (e.g. post-merge bonuses).
   const productionMultiplier = Math.max(0, 1 + byKindPercent.productionPercent / 100);
   const mergedProductionMultiplier = Math.max(
     0,
@@ -262,6 +264,16 @@ export const getGridUpgradeCost = (gridUpgrade: GridModule | null): number => {
 
 // Get reroll cost for the grid module
 export const getGridRerollCost = (): number => GAME_CONFIG.rerollBaseCost;
+export const getGridRerollCostForModule = (module: GridModule | null): number => {
+  const rarityMultiplier: Record<Rarity, number> = {
+    common: 1,
+    uncommon: 1.75,
+    rare: 2.75,
+    epic: 4,
+  };
+  const multiplier = module ? rarityMultiplier[module.rarity] : 1;
+  return Math.floor(GAME_CONFIG.rerollBaseCost * multiplier);
+};
 
 // Generate a random bonus (avoids existing types)
 const getRandomBonusKind = (): BonusKind =>
