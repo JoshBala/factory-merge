@@ -401,8 +401,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       return createInitialState();
     }
 
-    case 'UPGRADE_GRID':
-    case 'UPGRADE_ROW': {
+    case 'UPGRADE_GRID': {
       const cost = getGridUpgradeCost(state.gridUpgrade);
       if (state.currency < cost) return state;
 
@@ -426,8 +425,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       };
     }
 
-    case 'REROLL_GRID_BONUSES':
-    case 'REROLL_ROW_BONUSES': {
+    case 'REROLL_GRID_BONUSES': {
       const module = state.gridUpgrade;
       if (!module) return state;
       const hasUnlocked = module.bonuses.some(bonus => !bonus.locked);
@@ -443,8 +441,7 @@ export const gameReducer = (state: GameState, action: GameAction): GameState => 
       };
     }
 
-    case 'TOGGLE_GRID_BONUS_LOCK':
-    case 'TOGGLE_ROW_BONUS_LOCK': {
+    case 'TOGGLE_GRID_BONUS_LOCK': {
       const module = state.gridUpgrade;
       if (!module) return state;
       if (action.bonusIndex >= module.bonuses.length) return state;
@@ -723,10 +720,6 @@ interface GameContextType {
     upgradeGrid: () => void;
     rerollGridBonuses: () => void;
     toggleGridBonusLock: (bonusIndex: number) => void;
-    // Legacy aliases
-    upgradeRow: (rowIndex: 0 | 1 | 2) => void;
-    rerollBonus: (rowIndex: 0 | 1 | 2) => void;
-    toggleBonusLock: (rowIndex: 0 | 1 | 2, bonusIndex: number) => void;
     moveMachine: (machineId: string, targetSlot: number) => void;
     scrapMachine: (machineId: string) => void;
     buyUpgrade: (upgradeId: string) => void;
@@ -789,12 +782,6 @@ export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children
     rerollGridBonuses: useCallback(() =>
       dispatch({ type: 'REROLL_GRID_BONUSES' }), []),
     toggleGridBonusLock: useCallback((bonusIndex: number) =>
-      dispatch({ type: 'TOGGLE_GRID_BONUS_LOCK', bonusIndex }), []),
-    upgradeRow: useCallback((_rowIndex: 0 | 1 | 2) =>
-      dispatch({ type: 'UPGRADE_GRID' }), []),
-    rerollBonus: useCallback((_rowIndex: 0 | 1 | 2) =>
-      dispatch({ type: 'REROLL_GRID_BONUSES' }), []),
-    toggleBonusLock: useCallback((_rowIndex: 0 | 1 | 2, bonusIndex: number) =>
       dispatch({ type: 'TOGGLE_GRID_BONUS_LOCK', bonusIndex }), []),
     moveMachine: useCallback((machineId: string, targetSlot: number) =>
       dispatch({ type: 'MOVE_MACHINE', machineId, targetSlot }), []),
